@@ -4,7 +4,13 @@ resolvers += "Typesafe Sonatype Snapshots" at "http://repo.typesafe.com/typesafe
 
 scalaVersion := "2.10.1"
 
-libraryDependencies += "bound" %% "bound" % "0.1-SNAPSHOT"
+libraryDependencies ++= Seq(
+  "org.scalaz" %% "scalaz-core" % "7.0-SNAPSHOT",
+  "clarifi" %% "f0" % "0.2-SNAPSHOT",
+  "bound" %% "bound-core" % "0.2-SNAPSHOT",
+  "bound" %% "bound-scalacheck-binding" % "0.2-SNAPSHOT",
+  "bound" %% "bound-f0-binding" % "0.2-SNAPSHOT"
+)
 
 crossScalaVersions := Seq("2.9.2", "2.9.3", "2.10.0", "2.10.1")
 
