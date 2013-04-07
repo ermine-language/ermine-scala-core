@@ -21,3 +21,5 @@ scalacOptions <++= (scalaVersion) map { sv =>
     else Seq("-feature", "-language:higherKinds", "-language:implicitConversions")
   Seq("-deprecation", "-unchecked") ++ versionDepOpts
 }
+
+initialCommands in console := "import scalaz._, Scalaz._"
