@@ -9,7 +9,8 @@ libraryDependencies ++= Seq(
   "clarifi" %% "f0" % "0.2-SNAPSHOT",
   "bound" %% "bound-core" % "0.2-SNAPSHOT",
   "bound" %% "bound-scalacheck-binding" % "0.2-SNAPSHOT",
-  "bound" %% "bound-f0-binding" % "0.2-SNAPSHOT"
+  "bound" %% "bound-f0-binding" % "0.2-SNAPSHOT",
+  "org.scalacheck" %% "scalacheck" % "1.10.0" % "test"
 )
 
 crossScalaVersions := Seq("2.9.2", "2.9.3", "2.10.0", "2.10.1")
