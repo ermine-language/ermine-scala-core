@@ -31,28 +31,17 @@ object CoreSerialization {
     case LitDouble(d) => j(d)
   }).erase
 
-  val hardcoreR: Reader[HardCore, DynamicF] = s10R(
-    intR,
-    intR,
-    intR,
-    longR,
-    byteR,
-    shortR,
-    stringR,
-    intR.map(_.toChar),
-    floatR,
-    doubleR
-  )(
-    Super(_),
-    Slot(_),
-    LitInt(_),
-    LitInt64(_),
-    LitByte(_),
-    LitShort(_),
-    LitString(_),
-    LitChar(_),
-    LitFloat(_),
-    LitDouble(_)
+  val hardcoreR: Reader[HardCore, DynamicF] = union10R(
+    intR.map(Super(_)),
+    intR.map(Slot(_)),
+    intR.map(LitInt(_)),
+    longR.map(LitInt64(_)),
+    byteR.map(LitByte(_)),
+    shortR.map(LitShort(_)),
+    stringR.map(LitString(_)),
+    intR.map(i => LitChar(i.toChar)),
+    floatR.map(LitFloat(_)),
+    doubleR.map(LitDouble(_))
   ).erase
 
   def branchW[V](vw: Writer[V, DynamicF]): Writer[Branch[V], DynamicF] = s2W(
@@ -63,10 +52,10 @@ object CoreSerialization {
     case Default(     body) => defaultWriter(body)
   }).erase
 
-  def branchR[V](vr: Reader[V, DynamicF]): Reader[Branch[V], DynamicF] = s2R(
-    tuple2R(intR, scopeIntCoreVR(vr)),  // Labeled
-    scopeIntCoreVR(vr)                  // Default
-  )(t => Labeled(t._1, t._2), Default(_)).erase
+  def branchR[V](vr: Reader[V, DynamicF]): Reader[Branch[V], DynamicF] = union2R(
+    tuple2R(intR, scopeIntCoreVR(vr)).map(t => Labeled(t._1, t._2)),
+    scopeIntCoreVR(vr).map(Default(_))
+  ).erase
 
   val coreW1: Writer1[Core] = new Writer1[Core] {
     def apply[A](aw: Writer[A, DynamicF]): Writer[Core[A], DynamicF] = coreW(aw)
@@ -111,28 +100,17 @@ object CoreSerialization {
   def coreR[V](vr: Reader[V, DynamicF]): Reader[Core[V], CoreF[V]] = {
     val si = scopeIntCoreVR(vr)
     fixFR[Core[V], CoreF](self =>
-      s10R(
-        vr,                                     // Var
-        hardcoreR,                              // HardCore
-        tuple2R(intR, listR(coreR(vr))),        // Data
-        tuple2R(coreR(vr), coreR(vr)),          // App
-        tuple2R(intR, si),                      // Lam
-        tuple2R(listR(si), si),                 // Let
-        tuple2R(coreR(vr), listR(branchR(vr))), // Case
-        tuple2R(listR(coreR(vr)), listR(si)),   // Dict
-        scopeR(unitR, coreR1, vr),              // LamDict
-        tuple2R(coreR(vr), coreR(vr))           // AppDict
-      )(
-        Var(_),
-        (h: HardCore) => h,
-        t => Data(t._1, t._2),
-        t => App(t._1, t._2),
-        t => Lam(t._1, t._2),
-        t => Let(t._1, t._2),
-        t => Case(t._1, t._2),
-        t => Dict(t._1, t._2),
-        LamDict(_),
-        t => AppDict(t._1, t._2)
+      union10R(
+        vr.map(Var(_)),
+        hardcoreR,
+        tuple2R(intR, listR(coreR(vr))).map(t => Data(t._1, t._2)),
+        tuple2R(coreR(vr), coreR(vr)).map(t => App(t._1, t._2)),
+        tuple2R(intR, si).map(t => Lam(t._1, t._2)),
+        tuple2R(listR(si), si).map(t => Let(t._1, t._2)),
+        tuple2R(coreR(vr), listR(branchR(vr))).map(t => Case(t._1, t._2)),
+        tuple2R(listR(coreR(vr)), listR(si)).map(t => Dict(t._1, t._2)),
+        scopeR(unitR, coreR1, vr).map(LamDict(_)),
+        tuple2R(coreR(vr), coreR(vr)).map(t => AppDict(t._1, t._2))
       ).erase
     ).erase
   }
