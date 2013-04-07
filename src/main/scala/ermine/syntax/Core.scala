@@ -18,18 +18,18 @@ data Core a
  */
 trait Branch[+V] { def body: Scope[Int, Core, V] }
   case class Labeled[+V](tag: Int, body: Scope[Int, Core, V]) extends Branch[V]
-  case class Default[+V](body: Scope[Int, Core, V]) extends Branch[V]
+  case class Default[+V](          body: Scope[Int, Core, V]) extends Branch[V]
 
 trait Core[+V]
-  case class Var[+V](v: V) extends Core[V]
-  case class Data[+V](tag: Int, fields: List[Core[V]]) extends Core[V]
-  case class App[+V](f: Core[V], x: Core[V]) extends Core[V]
-  case class Lam[+V](arity: Int, body: Scope[Int, Core, V]) extends Core[V]
+  case class Var[+V](v: V)                                                           extends Core[V]
+  case class Data[+V](tag: Int, fields: List[Core[V]])                               extends Core[V]
+  case class App[+V](f: Core[V], x: Core[V])                                         extends Core[V]
+  case class Lam[+V](arity: Int, body: Scope[Int, Core, V])                          extends Core[V]
   case class Let[+V](bindings: List[Scope[Int, Core, V]], body: Scope[Int, Core, V]) extends Core[V]
-  case class Case[+V](c: Core[V], branches: List[Branch[V]]) extends Core[V]
-  case class Dict[+V](supers: List[Core[V]], slots: List[Scope[Int, Core, V]]) extends Core[V]
-  case class LamDict[+V](body: Scope[Unit, Core, V]) extends Core[V]
-  case class AppDict[+V](f: Core[V], d: Core[V]) extends Core[V]
+  case class Case[+V](c: Core[V], branches: List[Branch[V]])                         extends Core[V]
+  case class Dict[+V](supers: List[Core[V]], slots: List[Scope[Int, Core, V]])       extends Core[V]
+  case class LamDict[+V](body: Scope[Unit, Core, V])                                 extends Core[V]
+  case class AppDict[+V](f: Core[V], d: Core[V])                                     extends Core[V]
 
 trait HardCore extends Core[Nothing]
   case class Super(i: Int)        extends HardCore
