@@ -4,7 +4,7 @@
     <facet type="scala" name="Scala">
       <configuration>
         <option name="compilerLibraryLevel" value="Global" />
-        <option name="compilerLibraryName" value="scala-compiler-2.10.1" />
+        <option name="compilerLibraryName" value="scala-2.10.1" />
       </configuration>
     </facet>
   </component>
@@ -17,13 +17,49 @@
       <excludeFolder url="file://$MODULE_DIR$/project/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
-    <orderEntry type="inheritedJdk" />
+    <orderEntry type="jdk" jdkName="1.7" jdkType="JavaSDK" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="scala-2.10.1" level="application" />
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$USER_HOME$/.ivy2/local/bound/bound_2.10/0.1-SNAPSHOT/jars/bound_2.10.jar!/" />
+          <root url="jar://$USER_HOME$/.ivy2/local/clarifi/f0_2.10/0.2-SNAPSHOT/jars/f0_2.10.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$USER_HOME$/.ivy2/local/bound/bound-core_2.10/0.2-SNAPSHOT/jars/bound-core_2.10.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$USER_HOME$/.ivy2/local/bound/bound-f0-binding_2.10/0.2-SNAPSHOT/jars/bound-f0-binding_2.10.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$USER_HOME$/.ivy2/local/bound/bound-scalacheck-binding_2.10/0.2-SNAPSHOT/jars/bound-scalacheck-binding_2.10.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$USER_HOME$/.ivy2/cache/org.scalacheck/scalacheck_2.10/jars/scalacheck_2.10-1.10.0.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
