@@ -46,7 +46,12 @@ object Branch {
     def equal(a: Branch[V], b: Branch[V]): Boolean = (a, b) match {
       case (Labeled(tag1, body1), Labeled(tag2, body2)) => tag1 === tag2 && body1 === body2
       case (Default(      body1), Default(      body2)) =>                  body1 === body2
+      case _ => false
     }
+  }
+  def boundBy[A,B](b: Branch[A])(f: A => Core[B]): Branch[B] = b match {
+    case Labeled(tag, body) => Labeled(tag, body >>>= f)
+    case Default(     body) => Default(     body >>>= f)
   }
 }
 
@@ -74,6 +79,7 @@ object Core {
       case (Dict(supers1, slots1), Dict(supers2, slots2)) => supers1 === supers2 && slots1 === slots2
       case (LamDict(body1), LamDict(body2)) => body1 === body2
       case (AppDict(f1, d1), AppDict(f2, d2)) => f1 === f2 && d1 === d2
+      case _ => false
     }
   }
 
@@ -84,16 +90,16 @@ object Core {
   implicit def coreMonad: Monad[Core] = new Monad[Core]{
     def point[A](a: => A) = Var(a)
     def bind[A,B](c: Core[A])(f: A => Core[B]): Core[B] = c match {
-      case Var(a) => f(a)
-      case h: HardCore => h
-      case Data(n, xs) => Data(n, xs.map(c => bind(c)(f)))
-      case App(x, y)   => App(bind(x)(f), bind(x)(f))
-      //case Lam(n, e)   => Lam(n, boundBy(f, e)
-      //case Let(bs, e)  => = Let (boundBy f <$> bs) (boundBy f e)
-      //case Case(e, as) => Case (e >>= f) (boundBy f <$> as)
-      //Dict(xs, ys)     => Dict xs.flatMap(f)) ((>>>= f) <$> ys)
-      //LamDict(e)       => LamDict (e >>>= f)
-      //AppDict(x, y)    => AppDict (x >>= f) (y >>= f)
+      case Var(a)        => f(a)
+      case h: HardCore   => h
+      case Data(n, xs)   => Data(n, xs.map(c => bind(c)(f)))
+      case App(x, y)     => App(bind(x)(f), bind(y)(f))
+      case Lam(n, e)     => Lam(n, e >>>= f)
+      case Let(bs, e)    => Let(bs.map(s => s >>>= f), e >>>= f)
+      case Case(e, as)   => Case(bind(e)(f), as.map(a => Branch.boundBy(a)(f)))
+      case Dict(xs, ys)  => Dict(xs.map(c => bind(c)(f)), ys.map(s => s >>>= f))
+      case LamDict(e)    => LamDict(e >>>= f)
+      case AppDict(x, y) => AppDict(bind(x)(f), bind(y)(f))
     }
   }
 }

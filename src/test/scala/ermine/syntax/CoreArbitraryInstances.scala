@@ -6,7 +6,7 @@ import Arbitrary.arbitrary
 import bound.scalacheck.BoundArbitraryInstances._
 import bound.Scope
 
-class CoreArbitraryInstances {
+object CoreArbitraryInstances {
 
   implicit val ArbitraryHardCore: Arbitrary[HardCore] = Arbitrary(oneOf(
     arbitrary[Int]   .map(Super(_)),
