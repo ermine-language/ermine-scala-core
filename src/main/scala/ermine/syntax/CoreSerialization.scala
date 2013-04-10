@@ -48,7 +48,7 @@ object CoreSerialization {
     doubleR .map(LitDouble(_))
   ).erase
 
-  def branchW[V](vw: Writer[V, DynamicF]): Writer[Branch[V], DynamicF] = s2W(
+  def branchW[V,F](vw: Writer[V,F]): Writer[Branch[V], DynamicF] = s2W(
     tuple2W(intW, scopeIntCoreVW(vw)),  // Labeled
     scopeIntCoreVW(vw)                  // Default
   )((labelWriter, defaultWriter) => (branch: Branch[V]) => branch match {
@@ -56,7 +56,7 @@ object CoreSerialization {
     case Default(     body) => defaultWriter(body)
   }).erase
 
-  def branchR[V](vr: Reader[V, DynamicF]): Reader[Branch[V], DynamicF] = union2R(
+  def branchR[V,F](vr: Reader[V,F]): Reader[Branch[V], DynamicF] = union2R(
     tuple2R(intR, scopeIntCoreVR(vr)).map(t => Labeled(t._1, t._2)),
     scopeIntCoreVR(vr).map(Default(_))
   ).erase
@@ -69,13 +69,13 @@ object CoreSerialization {
     def apply[A](aw: Reader[A, DynamicF]): Reader[Core[A], DynamicF] = coreR(aw)
   }
 
-  def scopeIntCoreVW[V] (vw: Writer[V, DynamicF]): Writer[Scope[Int, Core, V], DynamicF] = scopeW(intW, coreW1, vw)
-  def scopeIntCoreVR[V] (vr: Reader[V, DynamicF]): Reader[Scope[Int, Core, V], DynamicF] = scopeR(intR, coreR1, vr)
+  def scopeIntCoreVW[V,F] (vw: Writer[V, F]): Writer[Scope[Int, Core, V], DynamicF] = scopeW(intW, coreW1, vw)
+  def scopeIntCoreVR[V,F] (vr: Reader[V, F]): Reader[Scope[Int, Core, V], DynamicF] = scopeR(intR, coreR1, vr)
 
   type CoreF[V] = DynamicF
 
-  def coreW[V](vw: Writer[V, DynamicF]): Writer[Core[V], CoreF[V]] = {
-    val si = scopeIntCoreVW(vw)
+  def coreW[V,F](vw: Writer[V, F]): Writer[Core[V], CoreF[V]] = {
+    def si = scopeIntCoreVW(vw)
     fixFW[Core[V],CoreF](self => s10W(
       vw,                                  // Var
       hardcoreW,                           // HardCore
@@ -101,8 +101,8 @@ object CoreSerialization {
     }).erase).erase
   }
 
-  def coreR[V](vr: Reader[V, DynamicF]): Reader[Core[V], CoreF[V]] = {
-    val si = scopeIntCoreVR(vr)
+  def coreR[V,F](vr: Reader[V, F]): Reader[Core[V], CoreF[V]] = {
+    def si = scopeIntCoreVR(vr)
     fixFR[Core[V], CoreF](self =>
       union10R(
         vr.map(Var(_)),

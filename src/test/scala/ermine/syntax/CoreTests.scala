@@ -1,6 +1,5 @@
 package ermine.syntax
 
-
 import scalaz.{Equal, Scalaz}
 import Scalaz._
 import CoreArbitraryInstances._

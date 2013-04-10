@@ -23,3 +23,5 @@ scalacOptions <++= (scalaVersion) map { sv =>
 }
 
 initialCommands in console := "import scalaz._, Scalaz._"
+
+testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-s", "1000")
