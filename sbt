@@ -434,8 +434,7 @@ EOM
 # run sbt
 execRunner "$java_cmd" \
   $(get_mem_opts $sbt_mem) \
-  -DDevUnlock=./devUnlock.sig \
-  $(get_jvm_opts) \
+  $(get_jvm_opts) -Xss10M\
   -Dsbt.boot.directory=project/.boot \
   ${java_args[@]} \
   -jar "$sbt_jar" \

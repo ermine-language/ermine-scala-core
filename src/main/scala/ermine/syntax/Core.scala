@@ -71,6 +71,7 @@ object Core {
   implicit def coreEqual[V](implicit VE: Equal[V]): Equal[Core[V]] = new Equal[Core[V]] {
     def equal(a: Core[V], b: Core[V]): Boolean = (a, b) match {
       case (Var(v1), Var(v2)) => v1 === v2
+      case (h1:HardCore, h2:HardCore) => h1 === h2
       case (Data(tag1, fields1), Data(tag2, fields2)) => tag1 === tag2 && fields1 === fields2
       case (App(f1, x1), App(f2, x2)) => f1 === f2 && x1 === x2
       case (Lam(arity1, body1), Lam(arity2, body2)) => arity1 === arity2 && body1 === body2

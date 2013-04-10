@@ -12,14 +12,12 @@ object CoreTests extends ErmineProperties("Core Tests"){
 
   test("== reflexivity for Core (with Int)")(forAll{ (core:Core[Int]) => eqls(core, core) })
   test("== reflexivity for Core (with String)")(forAll{ (core:Core[String]) => eqls(core, core) })
+  test("== reflexivity for HardCore")(forAll{ (hc:HardCore) => HardCore.hardcoreEqual.equal(hc, hc) })
 
-  def eqls[A](a: Core[A], b: Core[A])(implicit eql: Equal[Core[A]]) = {
-    eql.equal(a, b)
-  }
+  def eqls[A](a: Core[A], b: Core[A])(implicit eql: Equal[Core[A]]) = eql.equal(a, b)
 }
 
 abstract class ErmineProperties(name: String) extends Properties(name){
-  def test(name:String)(f: => Prop) = property(name) = secure {
-    try f catch { case e: java.lang.Throwable  => e.printStackTrace(System.err); throw e }
-  }
+  def test(name:String)(f: => Prop) = property(name) = secure { trying(f) }
+  def trying(f: => Prop) = try f catch { case e: java.lang.Throwable  => e.printStackTrace(System.err); throw e }
 }
