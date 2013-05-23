@@ -11,7 +11,7 @@ import bound.BoundSerialization._
  */
 object CoreSerialization {
 
-  val hardcoreW: Writer[HardCore, DynamicF] = s10W(
+  val hardcoreW: Writer[HardCore, DynamicF] = s11W(
     intW,                            // Super
     intW,                            // Slot
     intW,                            // LitInt
@@ -21,8 +21,9 @@ object CoreSerialization {
     stringW,                         // LitString
     intW.cmap((c:Char) => c.toInt),  // LitChar
     floatW,                          // LitFloat
-    doubleW                          // LitDouble
-  )((a,b,c,d,e,f,g,h,i,j) => (hc: HardCore) => hc match {
+    doubleW,                         // LitDouble
+    stringW                          // Err
+  )((a,b,c,d,e,f,g,h,i,j,k) => (hc: HardCore) => hc match {
     case Super(i)     => a(i)
     case Slot(i)      => b(i)
     case LitInt(i)    => c(i)
@@ -33,9 +34,10 @@ object CoreSerialization {
     case LitChar(c)   => h(c)
     case LitFloat(f)  => i(f)
     case LitDouble(d) => j(d)
+    case Err(msg)     => k(msg)
   }).erase
 
-  val hardcoreR: Reader[HardCore, DynamicF] = union10R(
+  val hardcoreR: Reader[HardCore, DynamicF] = union11R(
     intR    .map(Super(_)),
     intR    .map(Slot(_)),
     intR    .map(LitInt(_)),
@@ -45,7 +47,8 @@ object CoreSerialization {
     stringR .map(LitString(_)),
     intR    .map(i => LitChar(i.toChar)),
     floatR  .map(LitFloat(_)),
-    doubleR .map(LitDouble(_))
+    doubleR .map(LitDouble(_)),
+    stringR .map(Err(_))
   ).erase
 
   def branchW[V,F](vw: Writer[V,F]): Writer[Branch[V], DynamicF] = s2W(

@@ -30,6 +30,7 @@ sealed trait HardCore extends Core[Nothing]
   case class LitChar(c: Char)     extends HardCore
   case class LitFloat(f: Float)   extends HardCore
   case class LitDouble(d: Double) extends HardCore
+  case class Err(msg: String)     extends HardCore
 
 object HardCore {
   implicit def hardcoreEqual: Equal[HardCore] = new Equal[HardCore] {
