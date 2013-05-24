@@ -49,7 +49,7 @@ object CoreInterp {
     }
     case Let(bs, b)  =>
       def inst = instantiateR((i: Int) => es(i)) _ // Scope[Int,Core,A] => Core[A]
-    lazy val es: Stream[Core[A]] = bs.toStream.map(inst)
+      lazy val es: Stream[Core[A]] = bs.toStream.map(inst)
       nf(inst(b))
   }
 
@@ -71,7 +71,7 @@ object CoreInterp {
     }
     case Let(bs, b)  =>
       def inst = instantiateR((i: Int) => es(i)) _ // Scope[Int,Core,A] => Core[A]
-    def es: Stream[Core[A]] = bs.toStream.map(inst)
+      def es: Stream[Core[A]] = bs.toStream.map(inst)
       whnf(inst(b))
   }
 
