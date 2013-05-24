@@ -33,6 +33,7 @@ object CoreInterp {
 
   def nf[A](e:Core[A]): Core[A] = e match {
     case Var(_)      => e
+    case h:HardCore   => h
     case Lam(0, b)   => nf(instantiate(b)(_ => sys.error("f")))
     case Lam(n, b)   => Lam(n, toScope(nf(fromScope(b))))
     case App(f, a)   => whnf(f) match {
@@ -54,13 +55,17 @@ object CoreInterp {
   }
 
   def whnf[A](e: Core[A]): Core[A] = e match {
+    // TODO: collapse all these => e's into one case at the bottom
+    // after finishing the function up.
     case Var(_)       => e
+    case h:HardCore   => e
+    case Data(_, _)   => e
     case Lam(0, body) => whnf(instantiate(body)(_ => sys.error("f")))
     case Lam(_, _)    => e
     case App(f, a)    => whnf(f) match {
       case Lam(1, b)  => whnf(instantiate1(a, b))
       case Lam(n, b)  => {
-        def twiddle(v:bound.Var[Int, Core[A]]) = v match {
+        def twiddle(v:bound.Var[Int, Core[A]]): bound.Var[Int, Core[A]] = v match {
           case B(0) => F(a)
           case B(n) => B(n-1)
           case F(e) => F(e)
@@ -73,6 +78,15 @@ object CoreInterp {
       def inst = instantiateR((i: Int) => es(i)) _ // Scope[Int,Core,A] => Core[A]
       def es: Stream[Core[A]] = bs.toStream.map(inst)
       whnf(inst(b))
+    case Case(c, branches, default) => whnf(c) match {
+      case Data(tag, fields) =>
+        // if there is no branch with the matching tag, the default has to be there
+        whnf(instantiate(branches.getOrElse(tag, default.get))(i => fields(i)))
+      case _ => ???
+    }
+    case Dict(xs, ys)   => ???
+    case LamDict(e)     => ???
+    case AppDict(x, y)  => ???
   }
 
   implicit class PimpedCore(e: Core[String]) {

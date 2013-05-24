@@ -51,18 +51,11 @@ object CoreSerialization {
     stringR .map(Err(_))
   ).erase
 
-  def branchW[V,F](vw: Writer[V,F]): Writer[Branch[V], DynamicF] = s2W(
-    tuple2W(intW, scopeIntCoreVW(vw)),  // Labeled
-    scopeIntCoreVW(vw)                  // Default
-  )((labelWriter, defaultWriter) => (branch: Branch[V]) => branch match {
-    case Labeled(tag, body) => labelWriter((tag, body))
-    case Default(     body) => defaultWriter(body)
-  }).erase
+  def branchesW[V,F](vw: Writer[V,F]): Writer[Map[Int, Scope[Int, Core, V]], DynamicF] =
+    repeatW(tuple2W(intW, scopeIntCoreVW(vw))).cmap((m:Map[Int, Scope[Int, Core, V]]) => m.toList).erase
 
-  def branchR[V,F](vr: Reader[V,F]): Reader[Branch[V], DynamicF] = union2R(
-    tuple2R(intR, scopeIntCoreVR(vr)).map(t => Labeled(t._1, t._2)),
-    scopeIntCoreVR(vr).map(Default(_))
-  ).erase
+  def branchesR[V,F](vr: Reader[V,F]): Reader[Map[Int, Scope[Int, Core, V]], DynamicF] =
+    listR(tuple2R(intR, scopeIntCoreVR(vr))).map(_.toMap).erase
 
   val coreW1: Writer1[Core] = new Writer1[Core] {
     def apply[A](aw: Writer[A, DynamicF]): Writer[Core[A], DynamicF] = coreW(aw)
@@ -80,16 +73,16 @@ object CoreSerialization {
   def coreW[V,F](vw: Writer[V, F]): Writer[Core[V], CoreF[V]] = {
     def si = scopeIntCoreVW(vw)
     fixFW[Core[V],CoreF](self => s10W(
-      vw,                                  // Var
-      hardcoreW,                           // HardCore
-      tuple2W(intW, repeatW(self)),        // Data
-      tuple2W(self, self),                 // App
-      tuple2W(intW, si),                   // Lam
-      tuple2W(repeatW(si), si),            // Let
-      tuple2W(self, repeatW(branchW(vw))), // Case
-      tuple2W(repeatW(self), repeatW(si)), // Dict
-      scopeW(unitW, coreW1, vw),           // LamDict
-      tuple2W(self, self)                  // AppDict
+      vw,                                                 // Var
+      hardcoreW,                                          // HardCore
+      tuple2W(intW, repeatW(self)),                       // Data
+      tuple2W(self, self),                                // App
+      tuple2W(intW, si),                                  // Lam
+      tuple2W(repeatW(si), si),                           // Let
+      tuple3W(self, branchesW(vw), optionW(si)), // Case
+      tuple2W(repeatW(self), repeatW(si)),                // Dict
+      scopeW(unitW, coreW1, vw),                          // LamDict
+      tuple2W(self, self)                                 // AppDict
     )((a,b,c,d,e,f,g,h,i,j)  => (core: Core[V]) => core match {
       case Var(v)            => a(v)
       case h:HardCore        => b(h)
@@ -97,7 +90,7 @@ object CoreSerialization {
       case App(f, x)         => d((f, x))
       case Lam(ar, body)     => e((ar, body))
       case Let(bs, b)        => f((bs, b))
-      case Case(c, bs)       => g((c, bs))
+      case Case(c, bs, d)    => g((c, bs, d))
       case Dict(sups, slots) => h((sups, slots))
       case LamDict(b)        => i(b)
       case AppDict(f, d)     => j((f, d))
@@ -114,7 +107,7 @@ object CoreSerialization {
         tuple2R(coreR(vr), coreR(vr))          .map(t => App(t._1, t._2)),
         tuple2R(intR, si)                      .map(t => Lam(t._1, t._2)),
         tuple2R(listR(si), si)                 .map(t => Let(t._1, t._2)),
-        tuple2R(coreR(vr), listR(branchR(vr))) .map(t => Case(t._1, t._2)),
+        tuple3R(coreR(vr), branchesR(vr), optionR(si)) .map(t => Case(t._1, t._2, t._3)),
         tuple2R(listR(coreR(vr)), listR(si))   .map(t => Dict(t._1, t._2)),
         scopeR(unitR, coreR1, vr)              .map(t => LamDict(t)),
         tuple2R(coreR(vr), coreR(vr))          .map(t => AppDict(t._1, t._2))

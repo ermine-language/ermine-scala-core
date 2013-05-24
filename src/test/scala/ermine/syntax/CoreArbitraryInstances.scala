@@ -22,11 +22,6 @@ object CoreArbitraryInstances {
     arbitrary[String].map(Err(_))
   ))
 
-  implicit def ArbitraryBranch[V](implicit a: Arbitrary[V]): Arbitrary[Branch[V]] = Arbitrary(Gen.sized { size => oneOf(
-    for { i <- arbitrary[Int]; s <- Gen.resize(size / 2, arbitrary[Scope[Int, Core, V]]) } yield Labeled(i, s),
-    Gen.resize(size / 2, arbitrary[Scope[Int, Core, V]]).map(Default(_)))
-  })
-
   implicit val Arbitrary1Core: Arbitrary1[Core] = new Arbitrary1[Core] {
     def arbitrary1[V](implicit a: Arbitrary[V]): Arbitrary[Core[V]] = implicitly[Arbitrary[Core[V]]]
   }
@@ -42,7 +37,11 @@ object CoreArbitraryInstances {
         for { f <- resize(arbitrary[Core[V]]); x <- resize(arbitrary[Core[V]]) } yield App(f, x),
         for { arity <- arbitrary[Int]; body <- resize(arbitrary[Scope[Int, Core, V]]) } yield Lam(arity, body),
         for { bindings <- resize(arbitrary[List[Scope[Int, Core, V]]]); body <- resize(arbitrary[Scope[Int, Core, V]]) } yield Let(bindings, body),
-        for { c <- resize(arbitrary[Core[V]]); branches <- resize(arbitrary[List[Branch[V]]]) } yield Case(c, branches),
+        for {
+          c        <- resize(arbitrary[Core[V]]);
+          branches <- resize(arbitrary[Map[Int, Scope[Int, Core, V]]])
+          default  <- resize(arbitrary[Option[Scope[Int, Core, V]]])
+        } yield Case(c, branches, default),
         for { supers <- resize(arbitrary[Int]); slots <- resize(arbitrary[List[Core[V]]]) } yield Data(supers, slots),
         for { body <- resize(arbitrary[Scope[Unit, Core, V]]) } yield LamDict(body),
         for { f <- resize(arbitrary[Core[V]]); d <- resize(arbitrary[Core[V]]) } yield AppDict(f, d)

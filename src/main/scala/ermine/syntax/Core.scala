@@ -38,24 +38,6 @@ object HardCore {
   }
 }
 
-sealed trait Branch[+V] { def body: Scope[Int, Core, V] }
-  case class Labeled[+V](tag: Int, body: Scope[Int, Core, V]) extends Branch[V]
-  case class Default[+V](          body: Scope[Int, Core, V]) extends Branch[V]
-
-object Branch {
-  implicit def branchEqual[V](implicit VE: Equal[V]): Equal[Branch[V]] = new Equal[Branch[V]] {
-    def equal(a: Branch[V], b: Branch[V]): Boolean = (a, b) match {
-      case (Labeled(tag1, body1), Labeled(tag2, body2)) => tag1 === tag2 && body1 === body2
-      case (Default(      body1), Default(      body2)) =>                  body1 === body2
-      case _ => false
-    }
-  }
-  def boundBy[A,B](b: Branch[A])(f: A => Core[B]): Branch[B] = b match {
-    case Labeled(tag, body) => Labeled(tag, body >>>= f)
-    case Default(     body) => Default(     body >>>= f)
-  }
-}
-
 sealed trait Core[+V]{
   def *[B >: V](e:Core[B]) = App(this, e)
 }
@@ -74,7 +56,7 @@ sealed trait Core[+V]{
   case class App[+V](f: Core[V], x: Core[V])                                         extends Core[V]
   case class Lam[+V](arity: Int, body: Scope[Int, Core, V])                          extends Core[V]
   case class Let[+V](bindings: List[Scope[Int, Core, V]], body: Scope[Int, Core, V]) extends Core[V]
-  case class Case[+V](c: Core[V], branches: List[Branch[V]])                         extends Core[V]
+  case class Case[+V](c: Core[V], branches: Map[Int, Scope[Int, Core, V]], default: Option[Scope[Int, Core, V]]) extends Core[V]
   case class Dict[+V](supers: List[Core[V]], slots: List[Scope[Int, Core, V]])       extends Core[V]
   case class LamDict[+V](body: Scope[Unit, Core, V])                                 extends Core[V]
   case class AppDict[+V](f: Core[V], d: Core[V])                                     extends Core[V]
@@ -89,7 +71,7 @@ object Core {
       case (App(f1, x1), App(f2, x2)) => f1 === f2 && x1 === x2
       case (Lam(arity1, body1), Lam(arity2, body2)) => arity1 === arity2 && body1 === body2
       case (Let(bindings1, body1), Let(bindings2, body2)) => bindings1 === bindings2 && body1 === body2
-      case (Case(c1, branches1), Case(c2, branches2)) => c1 === c2 && branches1 === branches2
+      case (Case(c1, branches1, def1), Case(c2, branches2, def2)) => c1 === c2 && branches1 === branches2 && def1 === def2
       case (Dict(supers1, slots1), Dict(supers2, slots2)) => supers1 === supers2 && slots1 === slots2
       case (LamDict(body1), LamDict(body2)) => body1 === body2
       case (AppDict(f1, d1), AppDict(f2, d2)) => f1 === f2 && d1 === d2
@@ -104,16 +86,16 @@ object Core {
   implicit def coreMonad: Monad[Core] = new Monad[Core]{
     def point[A](a: => A) = Var(a)
     def bind[A,B](c: Core[A])(f: A => Core[B]): Core[B] = c match {
-      case Var(a)        => f(a)
-      case h: HardCore   => h
-      case Data(n, xs)   => Data(n, xs.map(c => bind(c)(f)))
-      case App(x, y)     => App(bind(x)(f), bind(y)(f))
-      case Lam(n, e)     => Lam(n, e >>>= f)
-      case Let(bs, e)    => Let(bs.map(s => s >>>= f), e >>>= f)
-      case Case(e, as)   => Case(bind(e)(f), as.map(a => Branch.boundBy(a)(f)))
-      case Dict(xs, ys)  => Dict(xs.map(c => bind(c)(f)), ys.map(s => s >>>= f))
-      case LamDict(e)    => LamDict(e >>>= f)
-      case AppDict(x, y) => AppDict(bind(x)(f), bind(y)(f))
+      case Var(a)         => f(a)
+      case h: HardCore    => h
+      case Data(n, xs)    => Data(n, xs.map(c => bind(c)(f)))
+      case App(x, y)      => App(bind(x)(f), bind(y)(f))
+      case Lam(n, e)      => Lam(n, e >>>= f)
+      case Let(bs, e)     => Let(bs.map(s => s >>>= f), e >>>= f)
+      case Case(e, bs, d) => Case(bind(e)(f), bs.mapValues(a => a >>>= f), d.map(_ >>>= f))
+      case Dict(xs, ys)   => Dict(xs.map(c => bind(c)(f)), ys.map(s => s >>>= f))
+      case LamDict(e)     => LamDict(e >>>= f)
+      case AppDict(x, y)  => AppDict(bind(x)(f), bind(y)(f))
     }
   }
 
