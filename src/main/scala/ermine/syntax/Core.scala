@@ -55,8 +55,20 @@ object Branch {
   }
 }
 
-sealed trait Core[+V]
-  case class Var[+V](v: V)                                                           extends Core[V]
+sealed trait Core[+V]{
+  def *[B >: V](e:Core[B]) = App(this, e)
+}
+  object Var {
+    def apply[V](a: => V): Core[V] = new Var(a)
+    def unapply[V](e: Core[V]): Option[V] = e match {
+      case v:Var[V] => Some(v.get)
+      case _ => None
+    }
+  }
+  class Var[+V](a: => V) extends Core[V]{
+    lazy val get = a
+    override def toString = s"Var($a)"
+  }
   case class Data[+V](tag: Int, fields: List[Core[V]])                               extends Core[V]
   case class App[+V](f: Core[V], x: Core[V])                                         extends Core[V]
   case class Lam[+V](arity: Int, body: Scope[Int, Core, V])                          extends Core[V]
@@ -103,4 +115,15 @@ object Core {
       case AppDict(x, y) => AppDict(bind(x)(f), bind(y)(f))
     }
   }
+
+  // TODO: add the rest of the cases here!
+  def coreTraversable: Traverse[Core] = new Traverse[Core]{
+    def traverseImpl[F[+_], A, B](exp : Core[A])(f : A => F[B])(implicit A: Applicative[F]) : F[Core[B]] = exp match {
+      case Var(a)     => f(a).map(Var(_))
+      case App(x, y)  => A.apply2(traverse(x)(f), traverse(y)(f))(App(_, _))
+      case Lam(a, e)  => e.traverse(f)(A, coreTraversable).map(Lam(a, _))
+      case Let(bs, b) => A.apply2(bs.traverse(s => s.traverse(f)(A, coreTraversable)), b.traverse(f)(A, coreTraversable))(Let(_, _))
+    }
+  }
 }
+
