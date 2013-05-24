@@ -89,7 +89,7 @@ object CoreInterp {
   val True: Core[String] = lam("F")(lam("T")(Var("T")))
 
   val cooked = closed[String, String](let_(List(
-    ("False",  "f" !: "t" !: Var("f"))
+      ("False",  "f" !: "t" !: Var("f"))
     , ("True",   "f" !: "t" !: Var("t"))
     , ("if",     "b" !: "t" !: "f" !: Var("b") * Var("f") * Var("t"))
     , ("Zero",   "z" !: "s" !: Var("z"))
