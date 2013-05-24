@@ -18,7 +18,8 @@ object CoreArbitraryInstances {
     arbitrary[String].map(LitString(_)),
     arbitrary[Char]  .map(LitChar(_)),
     arbitrary[Float] .map(LitFloat(_)),
-    arbitrary[Double].map(LitDouble(_))
+    arbitrary[Double].map(LitDouble(_)),
+    arbitrary[String].map(Err(_))
   ))
 
   implicit def ArbitraryBranch[V](implicit a: Arbitrary[V]): Arbitrary[Branch[V]] = Arbitrary(Gen.sized { size => oneOf(
