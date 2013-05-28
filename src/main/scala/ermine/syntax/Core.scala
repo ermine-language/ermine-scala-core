@@ -114,9 +114,9 @@ object Core {
           bs.toList.traverse{ case (i, s) => traverseScope(s).map((i, _)) }.map(_.toMap),
           d.traverse(traverseScope)
         )(Case(_, _, _))
-        case Dict(xs, ys)   => sys.error("todo: traverse Dict")
-        case LamDict(e)     => sys.error("todo: traverse LamDict")
-        case AppDict(x, y)  => sys.error("todo: traverse AppDict")
+        case Dict(xs, ys)   => A.apply2(xs.traverse(traverse(_)(f)), ys.traverse(traverseScope))(Dict(_, _))
+        case LamDict(e)     => traverseScope(e).map(LamDict(_))
+        case AppDict(x, y)  => A.apply2(traverse(x)(f), traverse(y)(f))(AppDict(_, _))
       }
     }
   }
