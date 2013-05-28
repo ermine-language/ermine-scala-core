@@ -40,7 +40,7 @@ object CoreArbitraryInstances {
         for {
           c        <- resize(arbitrary[Core[V]]);
           branches <- resize(arbitrary[Map[Int, Scope[Int, Core, V]]])
-          default  <- resize(arbitrary[Option[Scope[Int, Core, V]]])
+          default  <- resize(arbitrary[Option[Scope[Unit, Core, V]]])
         } yield Case(c, branches, default),
         for { supers <- resize(arbitrary[Int]); slots <- resize(arbitrary[List[Core[V]]]) } yield Data(supers, slots),
         for { body <- resize(arbitrary[Scope[Unit, Core, V]]) } yield LamDict(body),

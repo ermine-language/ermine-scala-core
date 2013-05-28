@@ -56,7 +56,7 @@ sealed trait Core[+V]{
   case class App[+V](f: Core[V], x: Core[V])                                         extends Core[V]
   case class Lam[+V](arity: Int, body: Scope[Int, Core, V])                          extends Core[V]
   case class Let[+V](bindings: List[Scope[Int, Core, V]], body: Scope[Int, Core, V]) extends Core[V]
-  case class Case[+V](c: Core[V], branches: Map[Int, Scope[Int, Core, V]], default: Option[Scope[Int, Core, V]]) extends Core[V]
+  case class Case[+V](c: Core[V], branches: Map[Int, Scope[Int, Core, V]], default: Option[Scope[Unit, Core, V]]) extends Core[V]
   case class Dict[+V](supers: List[Core[V]], slots: List[Scope[Int, Core, V]])       extends Core[V]
   case class LamDict[+V](body: Scope[Unit, Core, V])                                 extends Core[V]
   case class AppDict[+V](f: Core[V], d: Core[V])                                     extends Core[V]
@@ -99,13 +99,25 @@ object Core {
     }
   }
 
-  // TODO: add the rest of the cases here!
   def coreTraversable: Traverse[Core] = new Traverse[Core]{
-    def traverseImpl[F[+_], A, B](exp : Core[A])(f : A => F[B])(implicit A: Applicative[F]) : F[Core[B]] = exp match {
-      case Var(a)     => f(a).map(Var(_))
-      case App(x, y)  => A.apply2(traverse(x)(f), traverse(y)(f))(App(_, _))
-      case Lam(a, e)  => e.traverse(f)(A, coreTraversable).map(Lam(a, _))
-      case Let(bs, b) => A.apply2(bs.traverse(s => s.traverse(f)(A, coreTraversable)), b.traverse(f)(A, coreTraversable))(Let(_, _))
+    def traverseImpl[F[+_], A, B](exp : Core[A])(f : A => F[B])(implicit A: Applicative[F]) : F[Core[B]] = {
+      def traverseScope[V](s: Scope[V, Core, A]) = s.traverse(f)(A, coreTraversable)
+      exp match {
+        case Var(a)         => f(a).map(Var(_))
+        case h: HardCore    => A.point(h)
+        case Data(n, xs)    => xs.traverse(traverse(_)(f)).map(Data(n, _))
+        case App(x, y)      => A.apply2(traverse(x)(f), traverse(y)(f))(App(_, _))
+        case Lam(a, e)      => e.traverse(f)(A, coreTraversable).map(Lam(a, _))
+        case Let(bs, b)     => A.apply2(bs.traverse(traverseScope), b.traverse(f)(A, coreTraversable))(Let(_, _))
+        case Case(e, bs, d) => A.apply3(
+          traverse(e)(f),
+          bs.toList.traverse{ case (i, s) => traverseScope(s).map((i, _)) }.map(_.toMap),
+          d.traverse(traverseScope)
+        )(Case(_, _, _))
+        case Dict(xs, ys)   => sys.error("todo: traverse Dict")
+        case LamDict(e)     => sys.error("todo: traverse LamDict")
+        case AppDict(x, y)  => sys.error("todo: traverse AppDict")
+      }
     }
   }
 }
