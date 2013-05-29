@@ -26,6 +26,15 @@ object CoreInterp {
         }
         Lam(n-1, Scope(b.unscope.map(twiddle)))
       }
+
+      // hacks for prims
+      case p@PrimFun(0, f) => nf(f.asInstanceOf[Core[A]])
+      case p@PrimFun(1, f) => f.asInstanceOf[List[Core[A]] => Core[A]].apply(List(nf(a)))
+      case p@PrimFun(n, f) => PartialApp(p, List(whnf(a)))
+      case PartialApp(p@PrimFun(n, f), args) =>
+        if(args.size + 1 == n) f.asInstanceOf[List[Core[A]] => Core[A]].apply(args :+ nf(a))
+        else PartialApp(p, args :+ whnf(a))
+
       case f1        => App(nf(f), nf(a))
     }
     case Let(bs, b)  =>
@@ -42,6 +51,10 @@ object CoreInterp {
     case Dict(_, _)    => sys.error("todo nf Dict")
     case LamDict(_)    => sys.error("todo nf LamDict")
     case AppDict(x, y) => sys.error("todo nf AppDict")
+
+    // hacks for prims
+    case PrimFun(_, _) => e
+    case PartialApp(_, _) => e
   }
 
   def whnf[A](e: Core[A]): Core[A] = e match {
@@ -61,6 +74,15 @@ object CoreInterp {
         }
         Lam(n-1, Scope(b.unscope.map(twiddle)))
       }
+
+      // hacks for prims
+      case p@PrimFun(0, f) => whnf(f.asInstanceOf[Core[A]])
+      case p@PrimFun(1, f) => f.asInstanceOf[List[Core[A]] => Core[A]].apply(List(nf(a)))
+      case p@PrimFun(n, f) => PartialApp(p, List(whnf(a)))
+      case PartialApp(p@PrimFun(n, f), args) =>
+        if(args.size + 1 == n) f.asInstanceOf[List[Core[A]] => Core[A]].apply(args :+ nf(a))
+        else PartialApp(p, args :+ whnf(a))
+
       case _          => App(f, a)
     }
     case Let(bs, b)   =>
@@ -87,6 +109,10 @@ object CoreInterp {
       case (LamDict(body), dict@Dict(_, _)) => whnf(instantiate1(dict, body))
       case _ => sys.error("not possible.")
     }
+
+    // hacks for prims
+    case PrimFun(_, _) => e
+    case PartialApp(_, _) => e
   }
 }
 
@@ -178,6 +204,11 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   val Fst  = "p" !: Case(Var("p"), Map(0 -> Scope(Var(B(0)))), None)
   val Snd  = "p" !: Case(Var("p"), Map(0 -> Scope(Var(B(1)))), None)
 
+  val Add = PrimFun(2, (args:List[Core[String]]) => (nf(args(0)), nf(args(1))) match {
+    case (LitInt(x), LitInt(y)) => LitInt(x + y)
+    case e => Err("Error in args to +: ${e.toString}")
+  })
+
   val cooked = closed[String, String](let_(List(
     ("False",  False)
   , ("True",   True)
@@ -189,9 +220,12 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   , ("Pair",   Pair)
   , ("fst",    Fst)
   , ("snd",    Snd)
-  ), (Var("snd") * (Var("Pair") * Var("one") * Var("True"))))).get
+  , ("+",      Add)
+  ),
+    (Var("+") * (Var("fst") * (Var("Pair") * Var("one") * Var("True"))) * Var("three"))
+  )).get
 
   def main(args: Array[String]){
-    println(nf(cooked) === True)
+    println(nf(cooked))
   }
 }
