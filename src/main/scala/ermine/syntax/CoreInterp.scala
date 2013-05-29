@@ -41,12 +41,13 @@ object CoreInterp {
       def inst = instantiateR((i: Int) => es(i)) _ // Scope[Int,Core,A] => Core[A]
       lazy val es: Stream[Core[A]] = bs.toStream.map(inst)
       nf(inst(b))
-    case Case(c, branches, default) => whnf(c) match {
+    case cse@Case(c, branches, default) => whnf(c) match {
       case Data(tag, fields) =>
         nf(branches.get(tag).map(instantiate(_)(i => fields(i))).getOrElse(
           instantiate1(Data(tag, fields), default.get)
         ))
-      case _ => sys.error("not possible...")
+      case e@Err(msg) => e
+      case x => sys.error(s"not possible... ${whnf(c)}, $x")
     }
     case Dict(_, _)    => sys.error("todo nf Dict")
     case LamDict(_)    => sys.error("todo nf LamDict")
@@ -95,6 +96,7 @@ object CoreInterp {
         whnf(branches.get(tag).map(instantiate(_)(i => fields(i))).getOrElse(
           instantiate1(Data(tag, fields), default.get)
         ))
+      case e@Err(msg) => e
       case _ => sys.error("not possible.")
     }
     case Dict(_, _)    => e
@@ -118,16 +120,25 @@ object CoreInterp {
 
 trait CoreInterpExampleHelpers {
 
-  import CoreInterp._
+  def indexWhere[A](a: A, as: Seq[A])(implicit e: Equal[A]): Option[Int] = {
+    val index = as.indexWhere(_ === a)
+    if(index == -1) None else Some(index)
+  }
+
+  // combinator for building dictionaries
+  def dict(slots: (String, Core[String])*): Core[String] = Dict(Nil, {
+    val (x, y) = slots.unzip
+    y.map(c => abstrakt(c)(indexWhere(_, x))).toList
+  })
+
+  // combinator for building case statements
+  def cases(c: Core[String], branches: (Int, (List[String], Core[String]))*): Core[String] = Case(
+    c, branches.toMap.mapValues{ case (vars, cr) => abstrakt(cr)(indexWhere(_, vars)) }, None
+  )
 
   //  A smart constructor for Lamb
-  def lam[A,F[+_]](vs: A*)(body: Core[A])(implicit m: Monad[F], e: Equal[A]) = {
-    def findIndex[A](a: A, as: List[(A, Int)])(implicit e: Equal[A]): Option[Int] = as match {
-      case Nil => None
-      case (x, i) :: xs => if(x === a) Some(i) else findIndex(a, xs)
-    }
-    Lam(vs.size, abstrakt(body)(b => findIndex(b, vs.toList.zipWithIndex)))
-  }
+  def lam[A,F[+_]](vs: A*)(body: Core[A])(implicit m: Monad[F], e: Equal[A]) =
+    Lam(vs.size, abstrakt(body)(b => indexWhere(b, vs.toList)))
 
   def let_[A](es: List[(A, Core[A])], e:Core[A]): Core[A] = es match {
     case Nil => e
@@ -195,6 +206,12 @@ object CoreInterpExample extends CoreInterpExampleHelpers {
 object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   import CoreInterp._
 
+  // Primitive functions
+  val Add = PrimFun(2, (args:List[Core[String]]) => (nf(args(0)), nf(args(1))) match {
+    case (LitInt(x), LitInt(y)) => LitInt(x + y)
+    case e => Err(s"Error in args to +: ${e.toString}")
+  })
+
   // Booleans
   val True: Core[String]  = Data(0, Nil)
   val False: Core[String] = Data(1, Nil)
@@ -204,25 +221,39 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   val Fst  = "p" !: Case(Var("p"), Map(0 -> Scope(Var(B(0)))), None)
   val Snd  = "p" !: Case(Var("p"), Map(0 -> Scope(Var(B(1)))), None)
 
-  val Add = PrimFun(2, (args:List[Core[String]]) => (nf(args(0)), nf(args(1))) match {
-    case (LitInt(x), LitInt(y)) => LitInt(x + y)
-    case e => Err("Error in args to +: ${e.toString}")
-  })
+  // List
+  val NiL: Core[String]  = Data(0, Nil)
+  val Cons = "head" !: "tail" !: Data(1, List(Var("head"), Var("tail")))
+  val Head  = "l" !: Case(Var("l"), Map(0 -> Scope(Err("Can't get the head of Nil")), 1 -> Scope(Var(B(0)))), None)
+  val Tail  = "l" !: Case(Var("l"), Map(0 -> Scope(Err("Can't get the tail of Nil")), 1 -> Scope(Var(B(1)))), None)
+
+  // Dictionaries
+  val EqBool = dict(
+    "==" -> ("a" !: "b" !: cases(Var("a"),
+      0 -> (Nil -> cases(Var("b"), 0 -> (Nil -> True), 1-> (Nil -> False))),
+      1 -> (Nil -> cases(Var("b"), 0 -> (Nil -> False), 1 -> (Nil -> True)))
+    ))
+  )
+
+  val ShowBool = dict(
+    "show" -> ("b" !: cases(Var("b"),
+      0 -> (Nil -> LitString("True")),
+      1 -> (Nil -> LitString("False"))
+    )
+  ))
 
   val cooked = closed[String, String](let_(List(
     ("False",  False)
   , ("True",   True)
-  , ("Zero",   LitInt(0))
   , ("one",    LitInt(1))
-  , ("two",    LitInt(2))
-  , ("three",  LitInt(3))
-  , ("const",  "x" !: "y" !: Var("x"))
   , ("Pair",   Pair)
   , ("fst",    Fst)
   , ("snd",    Snd)
   , ("+",      Add)
+  , ("EqBool", EqBool)
+  , ("ShowBool", ShowBool)
   ),
-    (Var("+") * (Var("fst") * (Var("Pair") * Var("one") * Var("True"))) * Var("three"))
+    (AppDict(Slot(0), Var("ShowBool"))) * ((AppDict(Slot(0), Var("EqBool"))) * Var("False") * (Var("snd") * (Var("Pair") * Var("one") * Var("False"))))
   )).get
 
   def main(args: Array[String]){
