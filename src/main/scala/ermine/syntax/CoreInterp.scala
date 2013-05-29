@@ -211,10 +211,31 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
     case (LitInt(x), LitInt(y)) => LitInt(x + y)
     case e => Err(s"Error in args to +: ${e.toString}")
   })
+  val Sub = PrimFun(2, (args:List[Core[String]]) => (nf(args(0)), nf(args(1))) match {
+    case (LitInt(x), LitInt(y)) => LitInt(x - y)
+    case e => Err(s"Error in args to -: ${e.toString}")
+  })
+
+  val PrintLit = PrimFun(1, (args:List[Core[String]]) => nf(args(0)) match {
+    case LitInt(x)    => LitString(x.toString)
+    case LitInt64(l)  => LitString(l.toString)
+    case LitByte(b)   => LitString(b.toString)
+    case LitShort(s)  => LitString(s.toString)
+    case LitString(s) => LitString(s.toString)
+    case LitChar(c)   => LitString(c.toString)
+    case LitFloat(f)  => LitString(f.toString)
+    case LitDouble(d) => LitString(d.toString)
+    case e            => Err(s"Bad argument to PrintLit: ${e.toString}")
+  })
 
   // Booleans
-  val True: Core[String]  = Data(0, Nil)
+  val True:  Core[String] = Data(0, Nil)
   val False: Core[String] = Data(1, Nil)
+
+  val EqLit = PrimFun(2, (args:List[Core[String]]) => (nf(args(0)), nf(args(1))) match {
+    case (a:Lit,b:Lit) => if(a==b) True else False
+    case e => Err(s"Bad argument to PrintLit: ${e.toString}")
+  })
 
   // Pair
   val Pair = "l" !: "r" !: Data(0, List(Var("l"), Var("r")))
@@ -223,9 +244,19 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
 
   // List
   val NiL: Core[String]  = Data(0, Nil)
-  val Cons = "head" !: "tail" !: Data(1, List(Var("head"), Var("tail")))
+  val Cons  = "head" !: "tail" !: Data(1, List(Var("head"), Var("tail")))
   val Head  = "l" !: Case(Var("l"), Map(0 -> Scope(Err("Can't get the head of Nil")), 1 -> Scope(Var(B(0)))), None)
   val Tail  = "l" !: Case(Var("l"), Map(0 -> Scope(Err("Can't get the tail of Nil")), 1 -> Scope(Var(B(1)))), None)
+  val Empty = "l" !: cases(Var("l"), 0 -> (Nil -> True), 1 -> (Nil -> False))
+
+  val Take  = "n" !: "xs" !:
+    Var("if") * (eqb(Var("n"), LitInt(0))) * NiL * (
+    Var("if") * (Var("empty") * Var("xs")) * NiL * (
+      Var("Cons") * (Var("head") * Var("xs")) * (Var("take") * Var("n-1") * Var("xs"))
+  ))
+
+  // Ones = 1 : ones
+  val Ones = Var("Cons") * LitInt(1) * Var("ones")
 
   // Dictionaries
   val EqBool = dict(
@@ -234,26 +265,39 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
       1 -> (Nil -> cases(Var("b"), 0 -> (Nil -> False), 1 -> (Nil -> True)))
     ))
   )
-
+  def eqb(a:Core[String], b: Core[String]) = AppDict(Slot(0), Var("EqBool")) * a * b
   val ShowBool = dict(
-    "show" -> ("b" !: cases(Var("b"),
-      0 -> (Nil -> LitString("True")),
-      1 -> (Nil -> LitString("False"))
-    )
-  ))
+    "show" -> ("b" !: cases(Var("b"), 0 -> (Nil -> LitString("True")), 1 -> (Nil -> LitString("False"))))
+  )
+  def showBool(c: Core[String]) = (AppDict(Slot(0), Var("ShowBool"))) * c
+  val EqInt = dict("==" -> ("a" !: "b" !: (Var("EqLit") * Var("a") * Var("b"))))
+  val ShowInt = dict("show" -> ("i" !: Var("printLit") * Var("i")))
+
+  val If = "t" !: "x" !: "y" !: cases(eqb(Var("t"), True), 0 -> (Nil -> Var("x")), 1 -> (Nil -> Var("y")))
 
   val cooked = closed[String, String](let_(List(
-    ("False",  False)
-  , ("True",   True)
-  , ("one",    LitInt(1))
-  , ("Pair",   Pair)
-  , ("fst",    Fst)
-  , ("snd",    Snd)
-  , ("+",      Add)
-  , ("EqBool", EqBool)
+    ("False",    False)
+  , ("True",     True)
+  , ("one",      LitInt(1))
+  , ("Pair",     Pair)
+  , ("fst",      Fst)
+  , ("snd",      Snd)
+  , ("printLit", PrintLit)
+  , ("+",        Add)
+  , ("EqBool",   EqBool)
   , ("ShowBool", ShowBool)
+  , ("EqLit",    EqLit)
+  , ("EqInt",    EqInt)
+  , ("ShowInt",  ShowInt)
+  , ("Nil",      NiL)
+  , ("Cons",     Cons)
+  , ("head",     Head)
+  , ("tail",     Tail)
+  , ("ones",     Ones)
+  , ("if",       If)
   ),
-    (AppDict(Slot(0), Var("ShowBool"))) * ((AppDict(Slot(0), Var("EqBool"))) * Var("False") * (Var("snd") * (Var("Pair") * Var("one") * Var("False"))))
+    Var("if") * Var("True") * Var("one") * Var("one")
+//    showBool(eqb(Var("True"), (Var("snd") * (Var("Pair") * Var("one") * Var("False")))))
   )).get
 
   def main(args: Array[String]){

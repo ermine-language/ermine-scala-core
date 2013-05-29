@@ -22,14 +22,15 @@ data Core a
 sealed trait HardCore extends Core[Nothing]
   case class Super(i: Int)        extends HardCore
   case class Slot(i: Int)         extends HardCore
-  case class LitInt(i: Int)       extends HardCore
-  case class LitInt64(l: Long)    extends HardCore
-  case class LitByte(b: Byte)     extends HardCore
-  case class LitShort(s: Short)   extends HardCore
-  case class LitString(s: String) extends HardCore
-  case class LitChar(c: Char)     extends HardCore
-  case class LitFloat(f: Float)   extends HardCore
-  case class LitDouble(d: Double) extends HardCore
+  trait Lit
+  case class LitInt(i: Int)       extends HardCore with Lit
+  case class LitInt64(l: Long)    extends HardCore with Lit
+  case class LitByte(b: Byte)     extends HardCore with Lit
+  case class LitShort(s: Short)   extends HardCore with Lit
+  case class LitString(s: String) extends HardCore with Lit
+  case class LitChar(c: Char)     extends HardCore with Lit
+  case class LitFloat(f: Float)   extends HardCore with Lit
+  case class LitDouble(d: Double) extends HardCore with Lit
   case class Err(msg: String)     extends HardCore
 
 object HardCore {
@@ -52,8 +53,31 @@ sealed trait Core[+V]{
     lazy val get = a
     override def toString = s"Var($a)"
   }
-  case class Data[+V](tag: Int, fields: List[Core[V]])                               extends Core[V]
-  case class App[+V](f: Core[V], x: Core[V])                                         extends Core[V]
+
+  object Data {
+    def apply[V](tag: => Int, fields: => List[Core[V]]): Core[V] = new Data(tag, fields)
+    def unapply[V](e: Core[V]): Option[(Int, List[Core[V]])] = e match {
+      case v:Data[V] => Some(v.get)
+      case _ => None
+    }
+  }
+  class Data[+V](tag: => Int, fields: => List[Core[V]]) extends Core[V]{
+    lazy val get = (tag, fields)
+    override def toString = s"Data($tag, $fields)"
+  }
+
+  object App {
+    def apply[V](f: => Core[V], x: => Core[V]): Core[V] = new App(f, x)
+    def unapply[V](e: Core[V]): Option[(Core[V], Core[V])] = e match {
+      case v:App[V] => Some(v.get)
+      case _ => None
+    }
+  }
+  class App[+V](f: => Core[V], x: => Core[V]) extends Core[V]{
+    lazy val get = (f, x)
+    override def toString = s"App($f, $x)"
+  }
+
   case class Lam[+V](arity: Int, body: Scope[Int, Core, V])                          extends Core[V]
   case class Let[+V](bindings: List[Scope[Int, Core, V]], body: Scope[Int, Core, V]) extends Core[V]
   case class Case[+V](c: Core[V], branches: Map[Int, Scope[Int, Core, V]], default: Option[Scope[Unit, Core, V]]) extends Core[V]
