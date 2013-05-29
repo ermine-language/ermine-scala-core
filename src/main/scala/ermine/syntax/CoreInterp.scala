@@ -90,14 +90,14 @@ object CoreInterp {
       def inst = instantiateR((i: Int) => es(i)) _ // Scope[Int,Core,A] => Core[A]
       def es: Stream[Core[A]] = bs.toStream.map(inst)
       whnf(inst(b))
-    case Case(c, branches, default) => whnf(c) match {
+    case cs@Case(c, branches, default) => whnf(c) match {
       case Data(tag, fields) =>
         // if there is no branch with the matching tag, the default has to be there
         whnf(branches.get(tag).map(instantiate(_)(i => fields(i))).getOrElse(
           instantiate1(Data(tag, fields), default.get)
         ))
       case e@Err(msg) => e
-      case _ => sys.error("not possible.")
+      case x => sys.error(s"not possible: $x, $cs")
     }
     case Dict(_, _)    => e
     case LamDict(_)    => e
@@ -250,9 +250,9 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   val Empty = "l" !: cases(Var("l"), 0 -> (Nil -> True), 1 -> (Nil -> False))
 
   val Take  = "n" !: "xs" !:
-    Var("if") * (eqb(Var("n"), LitInt(0))) * NiL * (
+    Var("if") * (eqInt(Var("n"), LitInt(0))) * NiL * (
     Var("if") * (Var("empty") * Var("xs")) * NiL * (
-      Var("Cons") * (Var("head") * Var("xs")) * (Var("take") * Var("n-1") * Var("xs"))
+    Var("Cons") * (Var("head") * Var("xs")) * (Var("take") * (Var("-") * Var("n") * LitInt(1)) * Var("xs"))
   ))
 
   // Ones = 1 : ones
@@ -271,6 +271,7 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   )
   def showBool(c: Core[String]) = (AppDict(Slot(0), Var("ShowBool"))) * c
   val EqInt = dict("==" -> ("a" !: "b" !: (Var("EqLit") * Var("a") * Var("b"))))
+  def eqInt(a:Core[String], b: Core[String]) = AppDict(Slot(0), Var("EqInt")) * a * b
   val ShowInt = dict("show" -> ("i" !: Var("printLit") * Var("i")))
 
   val If = "t" !: "x" !: "y" !: cases(eqb(Var("t"), True), 0 -> (Nil -> Var("x")), 1 -> (Nil -> Var("y")))
@@ -284,6 +285,7 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   , ("snd",      Snd)
   , ("printLit", PrintLit)
   , ("+",        Add)
+  , ("-",        Add)
   , ("EqBool",   EqBool)
   , ("ShowBool", ShowBool)
   , ("EqLit",    EqLit)
@@ -293,10 +295,13 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   , ("Cons",     Cons)
   , ("head",     Head)
   , ("tail",     Tail)
+  , ("empty",    Empty)
   , ("ones",     Ones)
   , ("if",       If)
+  , ("take",     Take)
   ),
-    Var("if") * Var("True") * Var("one") * Var("one")
+    Var("take") * LitInt(10) * Var("ones")
+//    Var("if") * Var("True") * Var("one") * Var("one")
 //    showBool(eqb(Var("True"), (Var("snd") * (Var("Pair") * Var("one") * Var("False")))))
   )).get
 
