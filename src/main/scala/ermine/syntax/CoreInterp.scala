@@ -130,18 +130,18 @@ trait CoreInterpExampleHelpers {
   }
 
   // combinator for building dictionaries
-  def dict(slots: (String, Core[String])*): Core[String] = Dict(Nil, {
+  def dict(slots: (String, Core[String])*): Dict[String] = Dict(Nil, {
     val (x, y) = slots.unzip
     y.map(c => abstrakt(c)(indexWhere(_, x))).toList
   })
 
   // combinator for building case statements
-  def cases(c: Core[String], branches: (Int, (List[String], Core[String]))*): Core[String] = Case(
+  def cases(c: Core[String], branches: (Int, (List[String], Core[String]))*): Case[String] = Case(
     c, branches.toMap.mapValues{ case (vars, cr) => abstrakt(cr)(indexWhere(_, vars)) }, None
   )
 
   //  A smart constructor for Lamb
-  def lam[A,F[+_]](vs: A*)(body: Core[A])(implicit m: Monad[F], e: Equal[A]) =
+  def lam[A,F[+_]](vs: A*)(body: Core[A])(implicit m: Monad[F], e: Equal[A]): Lam[A] =
     Lam(vs.size, abstrakt(body)(b => indexWhere(b, vs.toList)))
 
   def let_[A](es: List[(A, Core[A])], e:Core[A]): Core[A] = es match {
@@ -219,6 +219,10 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
     case (LitInt(x), LitInt(y)) => LitInt(x - y)
     case e => Err(s"Error in args to -: ${e.toString}")
   })
+  val StringAppend = PrimFun(2, (args:List[Core[String]]) => (nf(args(0)), nf(args(1))) match {
+    case (LitString(x), LitString(y)) => LitString(x + y)
+    case e => Err(s"Error in args to stringAppend: ${e.toString}")
+  })
 
   val PrintLit = PrimFun(1, (args:List[Core[String]]) => nf(args(0)) match {
     case LitInt(x)    => LitString(x.toString)
@@ -254,9 +258,24 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   val Empty = "l" !: cases(v"l", 0 -> (Nil -> True), 1 -> (Nil -> False))
 
   val Take  = "n" !: "xs" !:
-    v"if" * (eqInt(v"n", LitInt(0))) * NiL * (
-    v"if" * (v"empty" * v"xs") * NiL * (
-    v"Cons" * (v"head" * v"xs") * (v"take" * (v"-" * v"n" * LitInt(1)) * v"xs")
+    v"if" * (eqInt(v"n", LitInt(0))) * NiL * cases(v"xs",
+      0 -> (Nil -> NiL),
+      1 -> (List("h", "t") -> v"Cons" * v"h" * (v"take" * (v"-" * v"n" * LitInt(1)) * v"t"))
+    )
+
+  val ListMap = "f" !: "l" !: cases(v"l",
+    0 -> (Nil -> NiL),
+    1 -> (List("h", "t") -> v"Cons" * (v"f" * v"h") * (v"map" * v"f" * v"t"))
+  )
+
+  val Intersperse = "sep" !: "l" !: cases(v"l",
+    0 -> (Nil -> NiL),
+    1 -> (List("x", "xs") -> v"Cons" * v"x" * (v"prependToAll" * v"sep" * v"xs")
+  ))
+
+  val PrependToAll = "sep" !: "l" !: cases(v"l",
+    0 -> (Nil -> NiL),
+    1 -> (List("x", "xs") -> v"Cons" * v"sep" * (v"Cons" * v"x" * (v"prependToAll" * v"sep" * v"xs"))
   ))
 
   // Ones = 1 : ones
@@ -278,6 +297,21 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   def eqInt(a:Core[String], b: Core[String]) = AppDict(Slot(0), v"EqInt") * a * b
   val ShowInt = dict("show" -> ("i" !: v"printLit" * v"i"))
 
+  val JoinStringList = "l" !: cases(v"l",
+    0 -> (Nil -> LitString("")),
+    1 -> (List("x", "xs") -> v"stringAppend" * v"x" * (v"joinStringList" * v"xs"))
+  )
+
+  def ShowList(sup: Dict[String]): Dict[String] = dict(
+    "show" -> ("l" !: cases(v"intersperse" * LitString(",") * (v"map" * (AppDict(Slot(0), sup)) * v"l"),
+      0 -> (Nil -> LitString("[]")),
+      1 -> (List("h", "t") -> v"stringAppend" * (v"stringAppend" * LitString("[") * (v"joinStringList" * (v"Cons" * v"h" * v"t"))) *  LitString("]"))
+  ))).copy(supers=List(sup))
+
+  val ShowBoolList = ShowList(ShowBool)
+  val ShowIntList  = ShowList(ShowInt)
+  def showIntList(c: Core[String]) = (AppDict(Slot(0), v"ShowIntList")) * c
+
   val If = "t" !: "x" !: "y" !: cases(eqb(v"t", True), 0 -> (Nil -> v"x"), 1 -> (Nil -> v"y"))
 
   val cooked = closed[String, String](let_(List(
@@ -290,6 +324,8 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   , ("printLit", PrintLit)
   , ("+",        Add)
   , ("-",        Sub)
+  , ("stringAppend", StringAppend)
+  , ("joinStringList", JoinStringList)
   , ("EqBool",   EqBool)
   , ("ShowBool", ShowBool)
   , ("EqLit",    EqLit)
@@ -297,16 +333,21 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   , ("ShowInt",  ShowInt)
   , ("Nil",      NiL)
   , ("Cons",     Cons)
+  , ("ShowBoolList", ShowBoolList)
+  , ("ShowIntList" , ShowIntList)
   , ("head",     Head)
   , ("tail",     Tail)
   , ("empty",    Empty)
+  , ("map",      ListMap)
+  , ("prependToAll", PrependToAll)
+  , ("intersperse" , Intersperse)
   , ("ones",     Ones)
   , ("if",       If)
   , ("take",     Take)
   ),
-    v"take" * LitInt(10) * v"ones"
-//    v"if" * v"True" * v"one" * v"one"
-//    showBool(eqb(v"True", (v"snd" * (v"Pair" * v"one" * v"False"))))
+  showIntList(v"intersperse" * LitInt(7) * (v"map" * (v"+" * LitInt(2)) * (v"take" * LitInt(10) * v"ones")))
+//  v"if" * v"True" * v"one" * v"one"
+//  showBool(eqb(v"True", (v"snd" * (v"Pair" * v"one" * v"False"))))
   )).get
 
   def main(args: Array[String]){
