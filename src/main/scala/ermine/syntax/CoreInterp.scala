@@ -213,15 +213,15 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   // Primitive functions
   val Add = PrimFun(2, (args:List[Core[String]]) => (nf(args(0)), nf(args(1))) match {
     case (LitInt(x), LitInt(y)) => LitInt(x + y)
-    case e => Err(s"Error in args to +: ${e.toString}")
+    case e => Err(s"Error in args to +: $e")
   })
   val Sub = PrimFun(2, (args:List[Core[String]]) => (nf(args(0)), nf(args(1))) match {
     case (LitInt(x), LitInt(y)) => LitInt(x - y)
-    case e => Err(s"Error in args to -: ${e.toString}")
+    case e => Err(s"Error in args to -: $e")
   })
   val StringAppend = PrimFun(2, (args:List[Core[String]]) => (nf(args(0)), nf(args(1))) match {
     case (LitString(x), LitString(y)) => LitString(x + y)
-    case e => Err(s"Error in args to stringAppend: ${e.toString}")
+    case e => Err(s"Error in args to stringAppend: $e")
   })
 
   val PrintLit = PrimFun(1, (args:List[Core[String]]) => nf(args(0)) match {
@@ -242,7 +242,7 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
 
   val EqLit = PrimFun(2, (args:List[Core[String]]) => (nf(args(0)), nf(args(1))) match {
     case (a:Lit,b:Lit) => if(a==b) True else False
-    case e => Err(s"Bad argument to PrintLit: ${e.toString}")
+    case e => Err(s"Bad argument to PrintLit: $e")
   })
 
   // Pair
@@ -256,6 +256,7 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   val Head  = "l" !: Case(v"l", Map(0 -> Scope(Err("Can't get the head of Nil")), 1 -> Scope(Var(B(0)))), None)
   val Tail  = "l" !: Case(v"l", Map(0 -> Scope(Err("Can't get the tail of Nil")), 1 -> Scope(Var(B(1)))), None)
   val Empty = "l" !: cases(v"l", 0 -> (Nil -> True), 1 -> (Nil -> False))
+  def singleton(a: Core[String]) = v"Cons" * a * NiL
 
   val Take  = "n" !: "xs" !:
     v"if" * (eqInt(v"n", LitInt(0))) * NiL * cases(v"xs",
@@ -266,6 +267,11 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   val ListMap = "f" !: "l" !: cases(v"l",
     0 -> (Nil -> NiL),
     1 -> (List("h", "t") -> v"Cons" * (v"f" * v"h") * (v"map" * v"f" * v"t"))
+  )
+
+  val ListConcat = "xs" !: "ys" !: cases(v"xs",
+    0 -> (Nil -> v"ys"),
+    1 -> (List("h", "xs'") -> v"Cons" * v"h" * (v"concat" * v"xs'" * v"ys"))
   )
 
   val Intersperse = "sep" !: "l" !: cases(v"l",
@@ -313,6 +319,12 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   def showIntList(c: Core[String]) = (AppDict(Slot(0), v"ShowIntList")) * c
 
   val If = "t" !: "x" !: "y" !: cases(eqb(v"t", True), 0 -> (Nil -> v"x"), 1 -> (Nil -> v"y"))
+
+  val ListFunctor = dict("fmap" -> ListMap)
+  val ListAp      = dict(
+    "pure" -> ("a" !: singleton(v"a")),
+    "<*>"  -> ("f" !: "a" !: (v"concat" * (v"map" * ("x" !: (v"map" * ("y" !: v"x" * v"y")) * v"f") * v"a")))
+  )
 
   val cooked = closed[String, String](let_(List(
     ("False",    False)
