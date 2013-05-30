@@ -325,6 +325,10 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
     "pure" -> ("a" !: singleton(v"a")),
     "<*>"  -> ("f" !: "a" !: (v"concat" * (v"map" * ("x" !: (v"map" * ("y" !: v"x" * v"y")) * v"f") * v"a")))
   )
+  val ListMonad   = dict(
+    "unit" -> ("a" !: singleton(v"a")),
+    "<*>"  -> ("xs" !: "f" !: (v"concat" * (v"map" * v"xs" * v"f")))
+  )
 
   val cooked = closed[String, String](let_(List(
     ("False",    False)
