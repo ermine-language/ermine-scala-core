@@ -120,6 +120,10 @@ object CoreInterp {
 
 trait CoreInterpExampleHelpers {
 
+  implicit class MkVar(val sc: StringContext) {
+    def v(args: Any*): Core[String] = Var(sc.parts.mkString)
+  }
+
   def indexWhere[A](a: A, as: Seq[A])(implicit e: Equal[A]): Option[Int] = {
     val index = as.indexWhere(_ === a)
     if(index == -1) None else Some(index)
@@ -169,34 +173,34 @@ object CoreInterpExample extends CoreInterpExampleHelpers {
 
   //  true :: Core String
   //  true = lam "F" $ lam "T" $ V "T"
-  val True: Core[String] = lam("F")(lam("T")(Var("T")))
+  val True: Core[String] = lam("F")(lam("T")(v"T"))
 
   val cooked = closed[String, String](let_(List(
-    ("False",  "f" !: "t" !: Var("f"))
-  , ("True",   "f" !: "t" !: Var("t"))
-  , ("if",     "b" !: "t" !: "f" !: Var("b") * Var("f") * Var("t"))
-  , ("Zero",   "z" !: "s" !: Var("z"))
-  , ("Succ",   "n" !: "z" !: "s" !: Var("s") * Var("n"))
-  , ("one",    Var("Succ") * Var("Zero"))
-  , ("two",    Var("Succ") * Var("one"))
-  , ("three",  Var("Succ") * Var("two"))
-  , ("isZero", "n" !: Var("n") * Var("True") * ("m" !: Var("False")))
-  , ("const",  "x" !: "y" !: Var("x"))
-  , ("Pair",   "a" !: "b" !: "p" !: Var("p") * Var("a") * Var("b"))
-  , ("fst",    "ab" !: Var("ab") * ("a" !: "b" !: Var("a")))
-  , ("snd",    "ab" !: Var("ab") * ("a" !: "b" !: Var("b")))
-  , ("add",    "x" !: "y" !: Var("x") * Var("y") * ("n" !: Var("Succ") * (Var("add") * Var("n") * Var("y"))))
-  , ("mul",    "x" !: "y" !: Var("x") * Var("Zero") * ("n" !: Var("add") * Var("y") * (Var("mul") * Var("n") * Var("y"))))
-  , ("fac",    "x" !: Var("x") * Var("one") * ("n" !: Var("mul") * Var("x") * (Var("fac") * Var("n"))))
-  , ("eqnat",  "x" !: "y" !: Var("x") * (Var("y") * Var("True") * (Var("const") * Var("False"))) * ("x1" !: Var("y") * Var("False") * ("y1" !: Var("eqnat") * Var("x1") * Var("y1"))))
-  , ("sumto",  "x" !: Var("x") * Var("Zero") * ("n" !: Var("add") * Var("x") * (Var("sumto") * Var("n"))))
-  , ("n5",     Var("add") * Var("two") * Var("three"))
-  , ("n6",     Var("add") * Var("three") * Var("three"))
-  , ("n17",    Var("add") * Var("n6") * (Var("add") * Var("n6") * Var("n5")))
-  , ("n37",    Var("Succ") * (Var("mul") * Var("n6") * Var("n6")))
-  , ("n703",   Var("sumto") * Var("n37"))
-  , ("n720",   Var("fac") * Var("n6"))
-  ), (Var("eqnat") * Var("n720") * (Var("add") * Var("n703") * Var("n17"))))).get
+    ("False",  "f" !: "t" !: v"f")
+  , ("True",   "f" !: "t" !: v"t")
+  , ("if",     "b" !: "t" !: "f" !: v"b" * v"f" * v"t")
+  , ("Zero",   "z" !: "s" !: v"z")
+  , ("Succ",   "n" !: "z" !: "s" !: v"s" * v"n")
+  , ("one",    v"Succ" * v"Zero")
+  , ("two",    v"Succ" * v"one")
+  , ("three",  v"Succ" * v"two")
+  , ("isZero", "n" !: v"n" * v"True" * ("m" !: v"False"))
+  , ("const",  "x" !: "y" !: v"x")
+  , ("Pair",   "a" !: "b" !: "p" !: v"p" * v"a" * v"b")
+  , ("fst",    "ab" !: v"ab" * ("a" !: "b" !: v"a"))
+  , ("snd",    "ab" !: v"ab" * ("a" !: "b" !: v"b"))
+  , ("add",    "x" !: "y" !: v"x" * v"y" * ("n" !: v"Succ" * (v"add" * v"n" * v"y")))
+  , ("mul",    "x" !: "y" !: v"x" * v"Zero" * ("n" !: v"add" * v"y" * (v"mul" * v"n" * v"y")))
+  , ("fac",    "x" !: v"x" * v"one" * ("n" !: v"mul" * v"x" * (v"fac" * v"n")))
+  , ("eqnat",  "x" !: "y" !: v"x" * (v"y" * v"True" * (v"const" * v"False")) * ("x1" !: v"y" * v"False" * ("y1" !: v"eqnat" * v"x1" * v"y1")))
+  , ("sumto",  "x" !: v"x" * v"Zero" * ("n" !: v"add" * v"x" * (v"sumto" * v"n")))
+  , ("n5",     v"add" * v"two" * v"three")
+  , ("n6",     v"add" * v"three" * v"three")
+  , ("n17",    v"add" * v"n6" * (v"add" * v"n6" * v"n5"))
+  , ("n37",    v"Succ" * (v"mul" * v"n6" * v"n6"))
+  , ("n703",   v"sumto" * v"n37")
+  , ("n720",   v"fac" * v"n6")
+  ), (v"eqnat" * v"n720" * (v"add" * v"n703" * v"n17")))).get
 
   def main(args: Array[String]){
     println(nf(cooked) === True)
@@ -238,43 +242,43 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   })
 
   // Pair
-  val Pair = "l" !: "r" !: Data(0, List(Var("l"), Var("r")))
-  val Fst  = "p" !: Case(Var("p"), Map(0 -> Scope(Var(B(0)))), None)
-  val Snd  = "p" !: Case(Var("p"), Map(0 -> Scope(Var(B(1)))), None)
+  val Pair = "l" !: "r" !: Data(0, List(v"l", v"r"))
+  val Fst  = "p" !: Case(v"p", Map(0 -> Scope(Var(B(0)))), None)
+  val Snd  = "p" !: Case(v"p", Map(0 -> Scope(Var(B(1)))), None)
 
   // List
   val NiL: Core[String]  = Data(0, Nil)
-  val Cons  = "head" !: "tail" !: Data(1, List(Var("head"), Var("tail")))
-  val Head  = "l" !: Case(Var("l"), Map(0 -> Scope(Err("Can't get the head of Nil")), 1 -> Scope(Var(B(0)))), None)
-  val Tail  = "l" !: Case(Var("l"), Map(0 -> Scope(Err("Can't get the tail of Nil")), 1 -> Scope(Var(B(1)))), None)
-  val Empty = "l" !: cases(Var("l"), 0 -> (Nil -> True), 1 -> (Nil -> False))
+  val Cons  = "head" !: "tail" !: Data(1, List(v"head", v"tail"))
+  val Head  = "l" !: Case(v"l", Map(0 -> Scope(Err("Can't get the head of Nil")), 1 -> Scope(Var(B(0)))), None)
+  val Tail  = "l" !: Case(v"l", Map(0 -> Scope(Err("Can't get the tail of Nil")), 1 -> Scope(Var(B(1)))), None)
+  val Empty = "l" !: cases(v"l", 0 -> (Nil -> True), 1 -> (Nil -> False))
 
   val Take  = "n" !: "xs" !:
-    Var("if") * (eqInt(Var("n"), LitInt(0))) * NiL * (
-    Var("if") * (Var("empty") * Var("xs")) * NiL * (
-    Var("Cons") * (Var("head") * Var("xs")) * (Var("take") * (Var("-") * Var("n") * LitInt(1)) * Var("xs"))
+    v"if" * (eqInt(v"n", LitInt(0))) * NiL * (
+    v"if" * (v"empty" * v"xs") * NiL * (
+    v"Cons" * (v"head" * v"xs") * (v"take" * (v"-" * v"n" * LitInt(1)) * v"xs")
   ))
 
   // Ones = 1 : ones
-  val Ones = Var("Cons") * LitInt(1) * Var("ones")
+  val Ones = v"Cons" * LitInt(1) * v"ones"
 
   // Dictionaries
   val EqBool = dict(
-    "==" -> ("a" !: "b" !: cases(Var("a"),
-      0 -> (Nil -> cases(Var("b"), 0 -> (Nil -> True), 1-> (Nil -> False))),
-      1 -> (Nil -> cases(Var("b"), 0 -> (Nil -> False), 1 -> (Nil -> True)))
+    "==" -> ("a" !: "b" !: cases(v"a",
+      0 -> (Nil -> cases(v"b", 0 -> (Nil -> True), 1-> (Nil -> False))),
+      1 -> (Nil -> cases(v"b", 0 -> (Nil -> False), 1 -> (Nil -> True)))
     ))
   )
-  def eqb(a:Core[String], b: Core[String]) = AppDict(Slot(0), Var("EqBool")) * a * b
+  def eqb(a:Core[String], b: Core[String]) = AppDict(Slot(0), v"EqBool") * a * b
   val ShowBool = dict(
-    "show" -> ("b" !: cases(Var("b"), 0 -> (Nil -> LitString("True")), 1 -> (Nil -> LitString("False"))))
+    "show" -> ("b" !: cases(v"b", 0 -> (Nil -> LitString("True")), 1 -> (Nil -> LitString("False"))))
   )
-  def showBool(c: Core[String]) = (AppDict(Slot(0), Var("ShowBool"))) * c
-  val EqInt = dict("==" -> ("a" !: "b" !: (Var("EqLit") * Var("a") * Var("b"))))
-  def eqInt(a:Core[String], b: Core[String]) = AppDict(Slot(0), Var("EqInt")) * a * b
-  val ShowInt = dict("show" -> ("i" !: Var("printLit") * Var("i")))
+  def showBool(c: Core[String]) = (AppDict(Slot(0), v"ShowBool")) * c
+  val EqInt = dict("==" -> ("a" !: "b" !: (v"EqLit" * v"a" * v"b")))
+  def eqInt(a:Core[String], b: Core[String]) = AppDict(Slot(0), v"EqInt") * a * b
+  val ShowInt = dict("show" -> ("i" !: v"printLit" * v"i"))
 
-  val If = "t" !: "x" !: "y" !: cases(eqb(Var("t"), True), 0 -> (Nil -> Var("x")), 1 -> (Nil -> Var("y")))
+  val If = "t" !: "x" !: "y" !: cases(eqb(v"t", True), 0 -> (Nil -> v"x"), 1 -> (Nil -> v"y"))
 
   val cooked = closed[String, String](let_(List(
     ("False",    False)
@@ -300,9 +304,9 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   , ("if",       If)
   , ("take",     Take)
   ),
-    Var("take") * LitInt(10) * Var("ones")
-//    Var("if") * Var("True") * Var("one") * Var("one")
-//    showBool(eqb(Var("True"), (Var("snd") * (Var("Pair") * Var("one") * Var("False")))))
+    v"take" * LitInt(10) * v"ones"
+//    v"if" * v"True" * v"one" * v"one"
+//    showBool(eqb(v"True", (v"snd" * (v"Pair" * v"one" * v"False"))))
   )).get
 
   def main(args: Array[String]){
