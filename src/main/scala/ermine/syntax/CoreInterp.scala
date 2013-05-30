@@ -351,6 +351,9 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   )).get
 
   def main(args: Array[String]){
-    println(nf(cooked))
+    println(nf(cooked) match {
+      case LitString(s) => s
+      case x => x.toString
+    })
   }
 }
