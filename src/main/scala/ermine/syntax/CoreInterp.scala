@@ -78,10 +78,10 @@ object CoreInterp {
 
       // hacks for prims
       case p@PrimFun(0, f) => whnf(f.asInstanceOf[Core[A]])
-      case p@PrimFun(1, f) => f.asInstanceOf[List[Core[A]] => Core[A]].apply(List(nf(a)))
+      case p@PrimFun(1, f) => f.asInstanceOf[List[Core[A]] => Core[A]].apply(List(whnf(a)))
       case p@PrimFun(n, f) => PartialApp(p, List(whnf(a)))
       case PartialApp(p@PrimFun(n, f), args) =>
-        if(args.size + 1 == n) f.asInstanceOf[List[Core[A]] => Core[A]].apply(args :+ nf(a))
+        if(args.size + 1 == n) f.asInstanceOf[List[Core[A]] => Core[A]].apply(args :+ whnf(a))
         else PartialApp(p, args :+ whnf(a))
 
       case _          => App(f, a)
@@ -285,7 +285,7 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   , ("snd",      Snd)
   , ("printLit", PrintLit)
   , ("+",        Add)
-  , ("-",        Add)
+  , ("-",        Sub)
   , ("EqBool",   EqBool)
   , ("ShowBool", ShowBool)
   , ("EqLit",    EqLit)
