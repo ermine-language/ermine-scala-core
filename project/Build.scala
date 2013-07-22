@@ -3,7 +3,7 @@ import Keys._
 
 object ErmineScalaCoreBuild extends Build {
 
-  lazy val ermine = Project( id = "scala-ermine-core" , base = file(".")).dependsOn(machines, f0, boundCore, boundF0)
+  lazy val ermine = Project( id = "ermine-scala-core" , base = file(".")).dependsOn(machines, f0, boundCore, boundF0)
 
   lazy val machines  = fromGithub("runarorama", "scala-machines")
   lazy val boundCore = fromGithub("runarorama", "scala-bound", subProject = Some("core"))
