@@ -1,7 +1,5 @@
 name := "scala-ermine-core"
 
-resolvers += "Typesafe Sonatype Snapshots" at "http://repo.typesafe.com/typesafe/sonatype-snapshots/"
-
 scalaVersion := "2.10.2"
 
 libraryDependencies ++= Seq(
