@@ -9,9 +9,8 @@ libraryDependencies ++= Seq(
   "org.scalacheck" %% "scalacheck" % "1.10.0" % "test"
 )
 
-scalacOptions <++= (scalaVersion) map { sv =>
+scalacOptions ++=
   Seq("-deprecation", "-unchecked", "-feature", "-language:higherKinds", "-language:implicitConversions")
-}
 
 initialCommands in console := "import scalaz._, Scalaz._"
 
