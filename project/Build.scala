@@ -3,11 +3,12 @@ import Keys._
 
 object ErmineScalaCoreBuild extends Build {
 
-  lazy val ermine = Project( id = "ermine-scala-core" , base = file(".")).dependsOn(machines, f0, boundCore, boundF0)
+  lazy val ermine = Project( id = "ermine-scala-core" , base = file(".")).dependsOn(machines, f0, boundCore, boundF0, boundSCB)
 
   lazy val machines  = fromGithub("runarorama", "scala-machines")
   lazy val boundCore = fromGithub("runarorama", "scala-bound", subProject = Some("core"))
   lazy val boundF0   = fromGithub("runarorama", "scala-bound", subProject = Some("bound-f0-binding"))
+  lazy val boundSCB  = fromGithub("runarorama", "scala-bound", subProject = Some("bound-scalacheck-binding"))
   lazy val f0        = fromGithub("joshcough" , "f0")
 
   // force sbt to get the latest version of a project
