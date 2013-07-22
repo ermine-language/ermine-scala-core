@@ -14,7 +14,6 @@ object ErmineScalaCoreBuild extends Build {
 
   def fromGithub(githubUser: String, project: String, subProject: Option[String] = None, sha: Option[String] = None) = {
     // if a specific commit isnt supplied, just fetch the very latest commit.
-    // force sbt to get the latest version of a project
     // 'sbt update' doesn't seem to get the latest even though this says that it should
     // http://stackoverflow.com/questions/8864317/how-do-i-refresh-updated-git-dependency-artifacts-in-sbt
     // so instead we have to go to github and get the latest version.
