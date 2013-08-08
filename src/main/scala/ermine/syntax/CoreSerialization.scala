@@ -11,9 +11,19 @@ import bound.BoundSerialization._
  */
 object CoreSerialization {
 
-  val hardcoreW: Writer[HardCore, DynamicF] = s11W(
-    intW,                            // Super
-    intW,                            // Slot
+  lazy val hardcoreW: Writer[HardCore, DynamicF] = s4W(
+    intW,   // Super
+    intW,   // Slot
+    litW,   // Lit
+    stringW // Err
+  )((a,b,c,d) => (hc: HardCore) => hc match {
+    case Super(i) => a(i)
+    case Slot(i)  => b(i)
+    case l:Lit    => c(l)
+    case Err(msg) => d(msg)
+  }).erase
+
+  lazy val litW: Writer[Lit, DynamicF] = s8W(
     intW,                            // LitInt
     longW,                           // LitInt64
     byteW,                           // LitByte
@@ -21,25 +31,26 @@ object CoreSerialization {
     stringW,                         // LitString
     intW.cmap((c:Char) => c.toInt),  // LitChar
     floatW,                          // LitFloat
-    doubleW,                         // LitDouble
-    stringW                          // Err
-  )((a,b,c,d,e,f,g,h,i,j,k) => (hc: HardCore) => hc match {
-    case Super(i)     => a(i)
-    case Slot(i)      => b(i)
-    case LitInt(i)    => c(i)
-    case LitInt64(l)  => d(l)
-    case LitByte(b)   => e(b)
-    case LitShort(s)  => f(s)
-    case LitString(s) => g(s)
-    case LitChar(c)   => h(c)
-    case LitFloat(f)  => i(f)
-    case LitDouble(d) => j(d)
-    case Err(msg)     => k(msg)
+    doubleW                          // LitDouble
+  )((a,b,c,d,e,f,g,h) => (l: Lit) => l match {
+    case LitInt(i)    => a(i)
+    case LitInt64(l)  => b(l)
+    case LitByte(b)   => c(b)
+    case LitShort(s)  => d(s)
+    case LitString(s) => e(s)
+    case LitChar(c)   => f(c)
+    case LitFloat(f)  => g(f)
+    case LitDouble(d) => h(d)
   }).erase
 
-  val hardcoreR: Reader[HardCore, DynamicF] = union11R(
+  lazy val hardcoreR: Reader[HardCore, DynamicF] = union4R(
     intR    .map(Super(_)),
     intR    .map(Slot(_)),
+    litR,
+    stringR .map(Err(_))
+  ).erase
+
+  lazy val litR: Reader[Lit, DynamicF] = union8R(
     intR    .map(LitInt(_)),
     longR   .map(LitInt64(_)),
     byteR   .map(LitByte(_)),
@@ -47,8 +58,7 @@ object CoreSerialization {
     stringR .map(LitString(_)),
     intR    .map(i => LitChar(i.toChar)),
     floatR  .map(LitFloat(_)),
-    doubleR .map(LitDouble(_)),
-    stringR .map(Err(_))
+    doubleR .map(LitDouble(_))
   ).erase
 
   def branchesW[V,F](vw: Writer[V,F]): Writer[Map[Int, Scope[Int, Core, V]], DynamicF] =

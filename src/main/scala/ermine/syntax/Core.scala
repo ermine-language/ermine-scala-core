@@ -22,16 +22,16 @@ data Core a
 sealed trait HardCore extends Core[Nothing]
   case class Super(i: Int)        extends HardCore
   case class Slot(i: Int)         extends HardCore
-  trait Lit
-  case class LitInt(i: Int)       extends HardCore with Lit
-  case class LitInt64(l: Long)    extends HardCore with Lit
-  case class LitByte(b: Byte)     extends HardCore with Lit
-  case class LitShort(s: Short)   extends HardCore with Lit
-  case class LitString(s: String) extends HardCore with Lit
-  case class LitChar(c: Char)     extends HardCore with Lit
-  case class LitFloat(f: Float)   extends HardCore with Lit
-  case class LitDouble(d: Double) extends HardCore with Lit
   case class Err(msg: String)     extends HardCore
+  trait Lit extends HardCore
+  case class LitInt(i: Int)       extends Lit
+  case class LitInt64(l: Long)    extends Lit
+  case class LitByte(b: Byte)     extends Lit
+  case class LitShort(s: Short)   extends Lit
+  case class LitString(s: String) extends Lit
+  case class LitChar(c: Char)     extends Lit
+  case class LitFloat(f: Float)   extends Lit
+  case class LitDouble(d: Double) extends Lit
 
 object HardCore {
   implicit def hardcoreEqual: Equal[HardCore] = new Equal[HardCore] {
