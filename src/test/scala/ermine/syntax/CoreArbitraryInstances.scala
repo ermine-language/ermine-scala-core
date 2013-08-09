@@ -9,17 +9,17 @@ import bound.Scope
 object CoreArbitraryInstances {
 
   implicit val ArbitraryHardCore: Arbitrary[HardCore] = Arbitrary(oneOf(
-    arbitrary[Int]   .map(Super(_)),
-    arbitrary[Int]   .map(Slot(_)),
-    arbitrary[Int]   .map(LitInt(_)),
+    arbitrary[Int]   .map(Super),
+    arbitrary[Int]   .map(Slot),
+    arbitrary[Int]   .map(LitInt),
     arbitrary[Int]   .map(LitInt64(_)),
-    arbitrary[Byte]  .map(LitByte(_)),
-    arbitrary[Short] .map(LitShort(_)),
-    arbitrary[String].map(LitString(_)),
-    arbitrary[Char]  .map(LitChar(_)),
-    arbitrary[Float] .map(LitFloat(_)),
-    arbitrary[Double].map(LitDouble(_)),
-    arbitrary[String].map(Err(_))
+    arbitrary[Byte]  .map(LitByte),
+    arbitrary[Short] .map(LitShort),
+    //arbitrary[String].map(LitString),
+    arbitrary[Char]  .map(LitChar),
+    arbitrary[Float] .map(LitFloat),
+    arbitrary[Double].map(LitDouble)
+    //arbitrary[String].map(Err)
   ))
 
   implicit val Arbitrary1Core: Arbitrary1[Core] = new Arbitrary1[Core] {
@@ -31,7 +31,7 @@ object CoreArbitraryInstances {
     size match {
       case 0 => oneOf(for { v <- av.arbitrary } yield Var(v), ArbitraryHardCore.arbitrary)
       case n => oneOf(
-        for { v <- av.arbitrary } yield Var(v),
+        //        for { v <- av.arbitrary } yield Var(v),
         ArbitraryHardCore.arbitrary,
         for { tag <- arbitrary[Int]; fields <- resize(arbitrary[List[Core[V]]]) } yield Data(tag, fields),
         for { f <- resize(arbitrary[Core[V]]); x <- resize(arbitrary[Core[V]]) } yield App(f, x),

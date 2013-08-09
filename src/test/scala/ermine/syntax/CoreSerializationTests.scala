@@ -21,21 +21,22 @@ object CoreSerializationTests extends ErmineProperties("CoreSerializationTests")
 
 object RoundTripTest extends ErmineProperties("RoundTripTest") {
 
-  test("roundtrip")(roundtrip(coreW(intW), coreR(intR)))
-
   lazy val coreEchoExists = new java.io.File("../ermine/dist/build/core-echo/core-echo.exe").exists
 
-  def roundtrip[A,F](w: Writer[A,F], r: Reader[A,F])
-                    (implicit eql: Equal[A], arb: Arbitrary[A]): Prop = forAll{(a: A) =>
-    def callHaskellEcho(aOut: A) = {
-      println(a)
-      Sinks.toFile("../ermine/core.in").using{ s => w.bind(s)(aOut) }
-      val p = Runtime.getRuntime.exec("../ermine/dist/build/core-echo/core-echo.exe")
-      p.waitFor
-      Sources.fromFile("../ermine/core.in")(r)
-    }
-    coreEchoExists ==> (callHaskellEcho(a) === a)
+  //  test("roundtrip")(forAll{(a: HardCore) => coreEchoExists ==> (callHaskellEcho(hardcoreW, hardcoreR)(a) === a)})
+  test("roundtrip A")(callHaskellEcho(hardcoreW, hardcoreR)(LitChar('A')) === LitChar('A'))
+
+  def callHaskellEcho[A, F](w: Writer[A,F], r: Reader[A,F])(aOut: A)(implicit eql: Equal[A], arb: Arbitrary[A]): A = {
+    println(aOut)
+    Sinks.toFile("core.in").using{ s => w.bind(s)(aOut) }
+    val p = Runtime.getRuntime.exec("../ermine/dist/build/core-echo/core-echo.exe")
+    p.waitFor
+    Sources.fromFile("core.out")(r)
   }
+
+}
+
+
 
 //  def roundtrip[A,F](w: Writer[A,F], r: Reader[A,F])(implicit eql: Equal[A], arb: Arbitrary[A]): Prop = Prop(prms => {
 //    def callHaskellEcho(aOut: A) = {
@@ -48,7 +49,6 @@ object RoundTripTest extends ErmineProperties("RoundTripTest") {
 //    val aOut: A = arb.arbitrary(prms.genPrms).get
 //    Prop.all(callHaskellEcho(aOut) === aOut)(prms)
 //  })
-}
 
 //      Sinks.toProcess(p).using{s =>
 //        w.bind(s)(aOut)
