@@ -24,7 +24,7 @@ object RoundTripTest extends ErmineProperties("RoundTripTest") {
   lazy val coreEchoExists = new java.io.File("../ermine/dist/build/core-echo/core-echo.exe").exists
 
   //  test("roundtrip")(forAll{(a: HardCore) => coreEchoExists ==> (callHaskellEcho(hardcoreW, hardcoreR)(a) === a)})
-  test("roundtrip A")(callHaskellEcho(hardcoreW, hardcoreR)(LitChar('A')) === LitChar('A'))
+  test("roundtrip A")(coreEchoExists ==> (callHaskellEcho(hardcoreW, hardcoreR)(LitChar('A')) === LitChar('A')))
 
   def callHaskellEcho[A, F](w: Writer[A,F], r: Reader[A,F])(aOut: A)(implicit eql: Equal[A], arb: Arbitrary[A]): A = {
     println(aOut)
