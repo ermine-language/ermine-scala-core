@@ -2,8 +2,6 @@ name := "scala-ermine-core"
 
 scalaVersion := "2.10.2"
 
-resolvers += "runarorama bintray maven" at "http://dl.bintray.com/runarorama/maven/"
-
 libraryDependencies ++= Seq(
   "org.scalaz"     %% "scalaz-core"               % "7.0.2",
   "org.scalacheck" %% "scalacheck"                % "1.10.0" % "test",
