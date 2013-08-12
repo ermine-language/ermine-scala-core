@@ -15,11 +15,11 @@ object CoreArbitraryInstances {
     arbitrary[Int]   .map(LitInt64(_)),
     arbitrary[Byte]  .map(LitByte),
     arbitrary[Short] .map(LitShort),
-    //arbitrary[String].map(LitString),
+    arbitrary[String].map(LitString),
     //arbitrary[Char]  .map(LitChar),
     arbitrary[Float] .map(LitFloat),
-    arbitrary[Double].map(LitDouble)
-    //arbitrary[String].map(Err)
+    arbitrary[Double].map(LitDouble),
+    arbitrary[String].map(Err)
   ))
 
   implicit val Arbitrary1Core: Arbitrary1[Core] = new Arbitrary1[Core] {
