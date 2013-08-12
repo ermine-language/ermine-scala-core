@@ -20,3 +20,5 @@ initialCommands in console := "import scalaz._, Scalaz._"
 testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-s", "1000")
 
 seq(bintrayResolverSettings:_*)
+
+traceLevel := 10

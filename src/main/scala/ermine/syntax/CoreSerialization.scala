@@ -39,8 +39,8 @@ object CoreSerialization {
   }
 
   lazy val hardcoreW: Writer[HardCore, DynamicF] = s4W(
-    intW,   // Super
-    intW,   // Slot
+    byteW,  // Super
+    byteW,  // Slot
     litW,   // Lit
     stringW // Err
   )((a,b,c,d) => (hc: HardCore) => hc match {
@@ -71,21 +71,21 @@ object CoreSerialization {
   }).erase
 
   lazy val hardcoreR: Reader[HardCore, DynamicF] = union4R(
-    intR    .map(Super(_)),
-    intR    .map(Slot(_)),
+    byteR   .map(Super),
+    byteR   .map(Slot),
     litR,
-    stringR .map(Err(_))
+    stringR .map(Err)
   ).erase
 
   lazy val litR: Reader[Lit, DynamicF] = union8R(
-    intR    .map(LitInt(_)),
-    longR   .map(LitInt64(_)),
-    byteR   .map(LitByte(_)),
-    shortR  .map(LitShort(_)),
-    stringR .map(LitString(_)),
+    intR    .map(LitInt),
+    longR   .map(LitInt64),
+    byteR   .map(LitByte),
+    shortR  .map(LitShort),
+    stringR .map(LitString),
     utf8IntR.map(i => LitChar(i.toChar)),
-    floatR  .map(LitFloat(_)),
-    doubleR .map(LitDouble(_))
+    floatR  .map(LitFloat),
+    doubleR .map(LitDouble)
   ).erase
 
   def branchesW[V,F](vw: Writer[V,F]): Writer[Map[Int, Scope[Int, Core, V]], DynamicF] =

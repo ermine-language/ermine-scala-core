@@ -9,14 +9,14 @@ import bound.Scope
 object CoreArbitraryInstances {
 
   implicit val ArbitraryHardCore: Arbitrary[HardCore] = Arbitrary(oneOf(
-    arbitrary[Int]   .map(Super),
-    arbitrary[Int]   .map(Slot),
+    arbitrary[Byte]  .map(Super),
+    arbitrary[Byte]  .map(Slot),
     arbitrary[Int]   .map(LitInt),
     arbitrary[Int]   .map(LitInt64(_)),
     arbitrary[Byte]  .map(LitByte),
     arbitrary[Short] .map(LitShort),
     //arbitrary[String].map(LitString),
-    arbitrary[Char]  .map(LitChar),
+    //arbitrary[Char]  .map(LitChar),
     arbitrary[Float] .map(LitFloat),
     arbitrary[Double].map(LitDouble)
     //arbitrary[String].map(Err)
