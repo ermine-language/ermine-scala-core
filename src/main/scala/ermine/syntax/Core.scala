@@ -9,12 +9,12 @@ import Scalaz._
 data Core a
   = Var a
   | HardCore !HardCore
-  | Data !Int [Core a]
+  | Data !Word8 [Core a]
   | App !(Core a) !(Core a)
-  | Lam !Int !(Scope Int Core a)
-  | Let [Scope Int Core a] !(Scope Int Core a)
-  | Case !(Core a) [Branch a] -- TODO: IntMap?
-  | Dict { supers :: [Core a], slots :: [Scope Int Core a] }
+  | Lam !Word8 !(Scope Word8 Core a)
+  | Let [Scope Word8 Core a] !(Scope Word8 Core a)
+  | Case !(Core a) (Map Word8 (Word8, Scope Word8 Core a)) (Maybe (Scope () Core a))
+  | Dict { supers :: [Core a], slots :: [Scope Word8 Core a] }
   | LamDict !(Scope () Core a)
   | AppDict !(Core a) !(Core a)
   deriving (Eq,Show,Read,Functor,Foldable,Traversable)
@@ -55,13 +55,13 @@ sealed trait Core[+V]{
   }
 
   object Data {
-    def apply[V](tag: => Int, fields: => List[Core[V]]): Core[V] = new Data(tag, fields)
-    def unapply[V](e: Core[V]): Option[(Int, List[Core[V]])] = e match {
+    def apply[V](tag: => Byte, fields: => List[Core[V]]): Core[V] = new Data(tag, fields)
+    def unapply[V](e: Core[V]): Option[(Byte, List[Core[V]])] = e match {
       case v:Data[V] => Some(v.get)
       case _ => None
     }
   }
-  class Data[+V](tag: => Int, fields: => List[Core[V]]) extends Core[V]{
+  class Data[+V](tag: => Byte, fields: => List[Core[V]]) extends Core[V]{
     lazy val get = (tag, fields)
     override def toString = s"Data($tag, $fields)"
   }
@@ -78,10 +78,10 @@ sealed trait Core[+V]{
     override def toString = s"App($f, $x)"
   }
 
-  case class Lam[+V](arity: Int, body: Scope[Int, Core, V])                          extends Core[V]
-  case class Let[+V](bindings: List[Scope[Int, Core, V]], body: Scope[Int, Core, V]) extends Core[V]
-  case class Case[+V](c: Core[V], branches: Map[Int, Scope[Int, Core, V]], default: Option[Scope[Unit, Core, V]]) extends Core[V]
-  case class Dict[+V](supers: List[Core[V]], slots: List[Scope[Int, Core, V]])       extends Core[V]
+  case class Lam[+V](arity: Byte, body: Scope[Byte, Core, V])                          extends Core[V]
+  case class Let[+V](bindings: List[Scope[Byte, Core, V]], body: Scope[Byte, Core, V]) extends Core[V]
+  case class Case[+V](c: Core[V], branches: Map[Byte, Scope[Byte, Core, V]], default: Option[Scope[Unit, Core, V]]) extends Core[V]
+  case class Dict[+V](supers: List[Core[V]], slots: List[Scope[Byte, Core, V]])       extends Core[V]
   case class LamDict[+V](body: Scope[Unit, Core, V])                                 extends Core[V]
   case class AppDict[+V](f: Core[V], d: Core[V])                                     extends Core[V]
 

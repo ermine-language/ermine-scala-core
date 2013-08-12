@@ -19,12 +19,12 @@ object CoreInterp {
     case App(f, a)   => whnf(f) match {
       case Lam(1, b) =>  nf(instantiate1(a, b))
       case Lam(n, b) => {
-        def twiddle(v:bound.Var[Int, Core[A]]) = v match {
+        def twiddle(v:bound.Var[Byte, Core[A]]): bound.Var[Byte, Core[A]] = v match {
           case B(0)  => F(a)
-          case B(n)  => B(n-1)
+          case B(n)  => B((n-1).toByte)
           case F(e)  => F(e)
         }
-        Lam(n-1, Scope(b.unscope.map(twiddle)))
+        Lam((n-1).toByte, Scope(b.unscope.map(twiddle)))
       }
 
       // hacks for prims
@@ -38,7 +38,7 @@ object CoreInterp {
       case f1        => App(nf(f), nf(a))
     }
     case Let(bs, b)  =>
-      def inst = instantiateR((i: Int) => es(i)) _ // Scope[Int,Core,A] => Core[A]
+      def inst = instantiateR((i: Byte) => es(i.toInt)) _ // Scope[Int,Core,A] => Core[A]
       lazy val es: Stream[Core[A]] = bs.toStream.map(inst)
       nf(inst(b))
     case cse@Case(c, branches, default) => whnf(c) match {
@@ -68,12 +68,12 @@ object CoreInterp {
       case Err(msg)   => e
       case Lam(1, b)  => whnf(instantiate1(a, b))
       case Lam(n, b)  => {
-        def twiddle(v:bound.Var[Int, Core[A]]): bound.Var[Int, Core[A]] = v match {
-          case B(0)   => F(a)
-          case B(n)   => B(n-1)
-          case F(e)   => F(e)
+        def twiddle(v:bound.Var[Byte, Core[A]]): bound.Var[Byte, Core[A]] = v match {
+          case B(0)  => F(a)
+          case B(n)  => B((n-1).toByte)
+          case F(e)  => F(e)
         }
-        Lam(n-1, Scope(b.unscope.map(twiddle)))
+        Lam((n-1).toByte, Scope(b.unscope.map(twiddle)))
       }
 
       // hacks for prims
@@ -87,7 +87,7 @@ object CoreInterp {
       case _          => App(f, a)
     }
     case Let(bs, b)   =>
-      def inst = instantiateR((i: Int) => es(i)) _ // Scope[Int,Core,A] => Core[A]
+      def inst = instantiateR((i: Byte) => es(i.toInt)) _ // Scope[Int,Core,A] => Core[A]
       def es: Stream[Core[A]] = bs.toStream.map(inst)
       whnf(inst(b))
     case cs@Case(c, branches, default) => whnf(c) match {
@@ -105,7 +105,7 @@ object CoreInterp {
       case (Err(msg), _) => Err(msg)
       case (Super(i), Dict(sups, _))  => sups(i)
       case (Slot(i),  Dict(_, slots)) =>
-        def inst = instantiateR((i: Int) => es(i)) _ // Scope[Int,Core,A] => Core[A]
+        def inst = instantiateR((i: Byte) => es(i.toInt)) _ // Scope[Int,Core,A] => Core[A]
         def es: Stream[Core[A]] = slots.toStream.map(inst)
         whnf(es(i))
       case (LamDict(body), dict@Dict(_, _)) => whnf(instantiate1(dict, body))
@@ -124,8 +124,8 @@ trait CoreInterpExampleHelpers {
     def v(args: Any*): Core[String] = Var(sc.parts.mkString)
   }
 
-  def indexWhere[A](a: A, as: Seq[A])(implicit e: Equal[A]): Option[Int] = {
-    val index = as.indexWhere(_ === a)
+  def indexWhere[A](a: A, as: Seq[A])(implicit e: Equal[A]): Option[Byte] = {
+    val index = as.indexWhere(_ === a).toByte
     if(index == -1) None else Some(index)
   }
 
@@ -137,19 +137,19 @@ trait CoreInterpExampleHelpers {
 
   // combinator for building case statements
   def cases(c: Core[String], branches: (Int, (List[String], Core[String]))*): Case[String] = Case(
-    c, branches.toMap.mapValues{ case (vars, cr) => abstrakt(cr)(indexWhere(_, vars)) }, None
+    c, branches.toMap.mapKeys(_.toByte).mapValues{ case (vars, cr) => abstrakt(cr)(indexWhere(_, vars)) }, None
   )
 
   //  A smart constructor for Lamb
   def lam[A,F[+_]](vs: A*)(body: Core[A])(implicit m: Monad[F], e: Equal[A]): Lam[A] =
-    Lam(vs.size, abstrakt(body)(b => indexWhere(b, vs.toList)))
+    Lam(vs.size.toByte, abstrakt(body)(b => indexWhere(b, vs.toList)))
 
   def let_[A](es: List[(A, Core[A])], e:Core[A]): Core[A] = es match {
     case Nil => e
     case _ =>
       def abstr(e:Core[A]) = abstractR((a:A) => {
         val i = es.map(_._1).indexOf(a)
-        if(i>=0) Some(i) else None
+        if(i>=0) Some(i.toByte) else None
       })(e)
       Let(es.map(t => abstr(t._2)), abstr(e))
   }
@@ -247,14 +247,14 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
 
   // Pair
   val Pair = "l" !: "r" !: Data(0, List(v"l", v"r"))
-  val Fst  = "p" !: Case(v"p", Map(0 -> Scope(Var(B(0)))), None)
-  val Snd  = "p" !: Case(v"p", Map(0 -> Scope(Var(B(1)))), None)
+  val Fst  = "p" !: Case(v"p", Map(0.toByte -> Scope(Var(B(0.toByte)))), None)
+  val Snd  = "p" !: Case(v"p", Map(0.toByte -> Scope(Var(B(1.toByte)))), None)
 
   // List
   val NiL: Core[String]  = Data(0, Nil)
   val Cons  = "head" !: "tail" !: Data(1, List(v"head", v"tail"))
-  val Head  = "l" !: Case(v"l", Map(0 -> Scope(Err("Can't get the head of Nil")), 1 -> Scope(Var(B(0)))), None)
-  val Tail  = "l" !: Case(v"l", Map(0 -> Scope(Err("Can't get the tail of Nil")), 1 -> Scope(Var(B(1)))), None)
+  val Head  = "l" !: Case(v"l", Map(0.toByte -> Scope(Err("Can't get the head of Nil")), 1.toByte -> Scope(Var(B(0.toByte)))), None)
+  val Tail  = "l" !: Case(v"l", Map(0.toByte -> Scope(Err("Can't get the tail of Nil")), 1.toByte -> Scope(Var(B(1.toByte)))), None)
   val Empty = "l" !: cases(v"l", 0 -> (Nil -> True), 1 -> (Nil -> False))
   def singleton(a: Core[String]) = v"Cons" * a * NiL
 

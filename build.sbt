@@ -6,7 +6,7 @@ libraryDependencies ++= Seq(
   "org.scalaz"     %% "scalaz-core"               % "7.0.2",
   "org.scalacheck" %% "scalacheck"                % "1.10.0" % "test",
   "machines"       %% "machines"                  % "1.0",
-  "com.clarifi"    %% "f0"                        % "1.0.1",
+  "com.clarifi"    %% "f0"                        % "1.1",
   "bound"          %% "bound-core"                % "1.2",
   "bound"          %% "bound-f0-binding"          % "1.2",
   "bound"          %% "bound-scalacheck-binding"  % "1.2"

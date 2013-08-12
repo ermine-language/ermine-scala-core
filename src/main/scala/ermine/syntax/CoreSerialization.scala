@@ -61,11 +61,11 @@ object CoreSerialization {
     doubleR .map(LitDouble)
   ).erase
 
-  def branchesW[V,F](vw: Writer[V,F]): Writer[Map[Int, Scope[Int, Core, V]], DynamicF] =
-    repeatW(tuple2W(intW, scopeIntCoreVW(vw))).cmap((m:Map[Int, Scope[Int, Core, V]]) => m.toList).erase
+  def branchesW[V,F](vw: Writer[V,F]): Writer[Map[Byte, Scope[Byte, Core, V]], DynamicF] =
+    streamW(tuple2W(byteW, scopeByteCoreVW(vw))).cmap((m:Map[Byte, Scope[Byte, Core, V]]) => m.toList).erase
 
-  def branchesR[V,F](vr: Reader[V,F]): Reader[Map[Int, Scope[Int, Core, V]], DynamicF] =
-    listR(tuple2R(intR, scopeIntCoreVR(vr))).map(_.toMap).erase
+  def branchesR[V,F](vr: Reader[V,F]): Reader[Map[Byte, Scope[Byte, Core, V]], DynamicF] =
+    streamR(tuple2R(byteR, scopeByteCoreVR(vr))).map(_.toMap).erase
 
   val coreW1: Writer1[Core] = new Writer1[Core] {
     def apply[A](aw: Writer[A, DynamicF]): Writer[Core[A], DynamicF] = coreW(aw)
@@ -75,8 +75,8 @@ object CoreSerialization {
     def apply[A](aw: Reader[A, DynamicF]): Reader[Core[A], DynamicF] = coreR(aw)
   }
 
-  def scopeIntCoreVW[V,F] (vw: Writer[V, F]): Writer[Scope[Int, Core, V], DynamicF] = scopeW(intW, coreW1, vw)
-  def scopeIntCoreVR[V,F] (vr: Reader[V, F]): Reader[Scope[Int, Core, V], DynamicF] = scopeR(intR, coreR1, vr)
+  def scopeByteCoreVW[V,F] (vw: Writer[V, F]): Writer[Scope[Byte, Core, V], DynamicF] = scopeW(byteW, coreW1, vw)
+  def scopeByteCoreVR[V,F] (vr: Reader[V, F]): Reader[Scope[Byte, Core, V], DynamicF] = scopeR(byteR, coreR1, vr)
 
   def scopeUnitCoreVW[V,F] (vw: Writer[V, F]): Writer[Scope[Unit, Core, V], DynamicF] = scopeW(unitW, coreW1, vw)
   def scopeUnitCoreVR[V,F] (vr: Reader[V, F]): Reader[Scope[Unit, Core, V], DynamicF] = scopeR(unitR, coreR1, vr)
@@ -84,17 +84,17 @@ object CoreSerialization {
   type CoreF[V] = DynamicF
 
   def coreW[V,F](vw: Writer[V, F]): Writer[Core[V], CoreF[V]] = {
-    def si = scopeIntCoreVW(vw)
+    def sb = scopeByteCoreVW(vw)
     def su = scopeUnitCoreVW(vw)
     fixFW[Core[V],CoreF](self => s10W(
       vw,                                                 // Var
       hardcoreW,                                          // HardCore
-      tuple2W(intW, repeatW(self)),                       // Data
+      tuple2W(byteW, streamW(self)),                      // Data
       tuple2W(self, self),                                // App
-      tuple2W(intW, si),                                  // Lam
-      tuple2W(repeatW(si), si),                           // Let
+      tuple2W(byteW, sb),                                 // Lam
+      tuple2W(streamW(sb), sb),                           // Let
       tuple3W(self, branchesW(vw), optionW(su)),          // Case
-      tuple2W(repeatW(self), repeatW(si)),                // Dict
+      tuple2W(streamW(self), streamW(sb)),                // Dict
       su,                                                 // LamDict
       tuple2W(self, self)                                 // AppDict
     )((a,b,c,d,e,f,g,h,i,j)  => (core: Core[V]) => core match {
@@ -112,20 +112,20 @@ object CoreSerialization {
   }
 
   def coreR[V,F](vr: Reader[V, F]): Reader[Core[V], CoreF[V]] = {
-    def si = scopeIntCoreVR(vr)
+    def sb = scopeByteCoreVR(vr)
     def su = scopeUnitCoreVR(vr)
     fixFR[Core[V], CoreF](self =>
       union10R(
         vr.map(Var(_)),
         hardcoreR,
-        tuple2R(intR, listR(coreR(vr)))        .map(t => Data(t._1, t._2)),
-        tuple2R(coreR(vr), coreR(vr))          .map(t => App(t._1, t._2)),
-        tuple2R(intR, si)                      .map(t => Lam(t._1, t._2)),
-        tuple2R(listR(si), si)                 .map(t => Let(t._1, t._2)),
+        tuple2R(byteR, streamR(coreR(vr)))      .map(t => Data(t._1, t._2)),
+        tuple2R(coreR(vr), coreR(vr))           .map(t => App(t._1, t._2)),
+        tuple2R(byteR, sb)                      .map(t => Lam(t._1, t._2)),
+        tuple2R(streamR(sb), sb)                .map(t => Let(t._1, t._2)),
         tuple3R(coreR(vr), branchesR(vr), optionR(su)).map(t => Case(t._1, t._2, t._3)),
-        tuple2R(listR(coreR(vr)), listR(si))   .map(t => Dict(t._1, t._2)),
-        su                                     .map(t => LamDict(t)),
-        tuple2R(coreR(vr), coreR(vr))          .map(t => AppDict(t._1, t._2))
+        tuple2R(streamR(coreR(vr)), streamR(sb)).map(t => Dict(t._1, t._2)),
+        su                                      .map(t => LamDict(t)),
+        tuple2R(coreR(vr), coreR(vr))           .map(t => AppDict(t._1, t._2))
       ).erase
     ).erase
   }

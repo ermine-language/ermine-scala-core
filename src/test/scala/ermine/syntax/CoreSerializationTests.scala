@@ -23,11 +23,12 @@ object RoundTripTest extends ErmineProperties("RoundTripTest") {
 
   lazy val coreEchoExists = new java.io.File("../ermine/dist/build/core-echo/core-echo.exe").exists
 
-  test("roundtrip")(forAll{(a: HardCore) => coreEchoExists ==> (callHaskellEcho(hardcoreW, hardcoreR)(a) === a)})
-  //test("roundtrip A")(coreEchoExists ==> (callHaskellEcho(hardcoreW, hardcoreR)(LitChar('A')) === LitChar('A')))
+  test("roundtrip")(forAll{(a: Core[Int]) => coreEchoExists ==> (callHaskellEcho(coreW(intW), coreR(intR))(a) === a)})
 
   def callHaskellEcho[A, F](w: Writer[A,F], r: Reader[A,F])(aOut: A)(implicit eql: Equal[A], arb: Arbitrary[A]): A = {
     println(aOut)
+    new java.io.File("core.in").delete
+    new java.io.File("core.out").delete
     Sinks.toFile("core.in").using{ s => w.bind(s)(aOut) }
     val p = Runtime.getRuntime.exec("../ermine/dist/build/core-echo/core-echo.exe")
     p.waitFor
@@ -37,7 +38,7 @@ object RoundTripTest extends ErmineProperties("RoundTripTest") {
 }
 
 
-
+//test("roundtrip A")(coreEchoExists ==> (callHaskellEcho(hardcoreW, hardcoreR)(LitChar('A')) === LitChar('A')))
 //  def roundtrip[A,F](w: Writer[A,F], r: Reader[A,F])(implicit eql: Equal[A], arb: Arbitrary[A]): Prop = Prop(prms => {
 //    def callHaskellEcho(aOut: A) = {
 //      println(aOut)
