@@ -16,7 +16,7 @@ object CoreArbitraryInstances {
     arbitrary[Byte]  .map(LitByte),
     arbitrary[Short] .map(LitShort),
     arbitrary[String].map(LitString),
-    //arbitrary[Char]  .map(LitChar),
+    arbitrary[Char]  .map(LitChar),
     arbitrary[Float] .map(LitFloat),
     arbitrary[Double].map(LitDouble),
     arbitrary[String].map(Err)

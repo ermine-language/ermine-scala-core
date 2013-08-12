@@ -11,33 +11,6 @@ import bound.BoundSerialization._
  */
 object CoreSerialization {
 
-  /** A UTF-8 encoding for Char, as Haskell Binary expects. */
-  def utf8IntWF(i: Int, o: Sink): EffectW[DynamicF] = {
-    val bytes = new String(Array[Byte]((i >> 24).toByte, (i >> 16).toByte, (i >> 8).toByte, i.toByte), "UTF-32BE")
-      .getBytes("UTF-8")
-    println(bytes.toList.map(_.toInt))
-    bytes.foreach(o.apply)
-    Effects.effectW[DynamicF]
-  }
-
-  lazy val utf8IntW = new Writer[Int, DynamicF] {def bind(o: Sink) = utf8IntWF(_,o)}
-
-  def utf8IntRF(s: Source): Int = {
-    val fst = s.readByte
-    val rst = s.readBytes(fst.toInt & 0xFF match {
-      case m if m < 0x80 => 0
-      case m if m < 0xe0 => 1
-      case m if m < 0xf0 => 2
-      case _ => 3
-    })
-    val d = new String(fst +: rst, "UTF-8").getBytes("UTF-32BE")
-    d(0).toInt << 24 | d(1).toInt << 16 | d(2).toInt << 8 | d(3)
-  }
-
-  lazy val utf8IntR = new Reader[Int, DynamicF] {
-    def bind(s: Source) = new Get[Int] {def get = utf8IntRF(s)}
-  }
-
   lazy val hardcoreW: Writer[HardCore, DynamicF] = s4W(
     byteW,  // Super
     byteW,  // Slot
@@ -56,7 +29,7 @@ object CoreSerialization {
     byteW,                           // LitByte
     shortW,                          // LitShort
     stringW,                         // LitString
-    utf8IntW.cmap((c:Char) => c.toInt),  // LitChar
+    intW.cmap((c:Char) => c.toInt),  // LitChar
     floatW,                          // LitFloat
     doubleW                          // LitDouble
   )((a,b,c,d,e,f,g,h) => (l: Lit) => l match {
@@ -83,7 +56,7 @@ object CoreSerialization {
     byteR   .map(LitByte),
     shortR  .map(LitShort),
     stringR .map(LitString),
-    utf8IntR.map(i => LitChar(i.toChar)),
+    intR    .map(i => LitChar(i.toChar)),
     floatR  .map(LitFloat),
     doubleR .map(LitDouble)
   ).erase
