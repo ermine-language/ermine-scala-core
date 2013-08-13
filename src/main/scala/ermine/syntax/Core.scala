@@ -23,7 +23,7 @@ sealed trait HardCore extends Core[Nothing]
   case class Super(b: Byte)        extends HardCore
   case class Slot (b: Byte)        extends HardCore
   case class Err  (msg: String)    extends HardCore
-  trait Lit extends HardCore
+  sealed trait Lit extends HardCore
   case class LitInt   (i: Int)     extends Lit
   case class LitInt64 (l: Long)    extends Lit
   case class LitByte  (b: Byte)    extends Lit
