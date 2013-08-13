@@ -43,7 +43,7 @@ object CoreInterp {
       nf(inst(b))
     case cse@Case(c, branches, default) => whnf(c) match {
       case Data(tag, fields) =>
-        nf(branches.get(tag).map(instantiate(_)(i => fields(i))).getOrElse(
+        nf(branches.get(tag).map{ case (_, a) => instantiate(a)(i => fields(i)) }.getOrElse(
           instantiate1(Data(tag, fields), default.get)
         ))
       case e@Err(msg) => e
@@ -93,7 +93,7 @@ object CoreInterp {
     case cs@Case(c, branches, default) => whnf(c) match {
       case Data(tag, fields) =>
         // if there is no branch with the matching tag, the default has to be there
-        whnf(branches.get(tag).map(instantiate(_)(i => fields(i))).getOrElse(
+        whnf(branches.get(tag).map{ case (_, a) => instantiate(a)(i => fields(i)) }.getOrElse(
           instantiate1(Data(tag, fields), default.get)
         ))
       case e@Err(msg) => e
@@ -137,8 +137,11 @@ trait CoreInterpExampleHelpers {
 
   // combinator for building case statements
   def cases(c: Core[String], branches: (Int, (List[String], Core[String]))*): Case[String] = Case(
-    c, branches.toMap.mapKeys(_.toByte).mapValues{ case (vars, cr) => abstrakt(cr)(indexWhere(_, vars)) }, None
+    c, branches.toMap.mapKeys(_.toByte).mapValues{ case (vars, cr) => ((0:Byte), abstrakt(cr)(indexWhere(_, vars))) }, None
   )
+
+  def caseIgnoreArity[V](c: Core[V], branches: Map[Byte, Scope[Byte, Core, V]], default: Option[Scope[Unit, Core, V]]): Case[V] =
+    Case(c, branches.mapValues(s => (0, s)), default)
 
   //  A smart constructor for Lamb
   def lam[A,F[+_]](vs: A*)(body: Core[A])(implicit m: Monad[F], e: Equal[A]): Lam[A] =
@@ -247,25 +250,25 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
 
   // Pair
   val Pair = "l" !: "r" !: Data(0, List(v"l", v"r"))
-  val Fst  = "p" !: Case(v"p", Map(0.toByte -> Scope(Var(B(0.toByte)))), None)
-  val Snd  = "p" !: Case(v"p", Map(0.toByte -> Scope(Var(B(1.toByte)))), None)
+  val Fst  = "p" !: caseIgnoreArity(v"p", Map(0.toByte -> Scope(Var(B(0.toByte)))), None)
+  val Snd  = "p" !: caseIgnoreArity(v"p", Map(0.toByte -> Scope(Var(B(1.toByte)))), None)
 
   // List
   val NiL: Core[String]  = Data(0, Nil)
   val Cons  = "head" !: "tail" !: Data(1, List(v"head", v"tail"))
-  val Head  = "l" !: Case(v"l", Map(0.toByte -> Scope(Err("Can't get the head of Nil")), 1.toByte -> Scope(Var(B(0.toByte)))), None)
-  val Tail  = "l" !: Case(v"l", Map(0.toByte -> Scope(Err("Can't get the tail of Nil")), 1.toByte -> Scope(Var(B(1.toByte)))), None)
+  val Head  = "l" !: caseIgnoreArity(v"l", Map(0.toByte -> Scope(Err("Can't get the head of Nil")), 1.toByte -> Scope(Var(B(0.toByte)))), None)
+  val Tail  = "l" !: caseIgnoreArity(v"l", Map(0.toByte -> Scope(Err("Can't get the tail of Nil")), 1.toByte -> Scope(Var(B(1.toByte)))), None)
   val Empty = "l" !: cases(v"l", 0 -> (Nil -> True), 1 -> (Nil -> False))
   def singleton(a: Core[String]) = v"Cons" * a * NiL
 
   val Take  = "n" !: "xs" !:
-    v"if" * (eqInt(v"n", LitInt(0))) * NiL * cases(v"xs",
+    v"if" * eqInt(v"n", LitInt(0)) * NiL * cases(v"xs",
       0 -> (Nil -> NiL),
       1 -> (List("h", "t") -> v"Cons" * v"h" * (v"take" * (v"-" * v"n" * LitInt(1)) * v"t"))
     )
 
   val Replicate  = "n" !: "a" !:
-    v"if" * (eqInt(v"n", LitInt(0))) * NiL * (v"Cons" * v"a" * (v"replicate" * (v"-" * v"n" * LitInt(1)) * v"a"))
+    v"if" * eqInt(v"n", LitInt(0)) * NiL * (v"Cons" * v"a" * (v"replicate" * (v"-" * v"n" * LitInt(1)) * v"a"))
 
   val ListMap = "f" !: "l" !: cases(v"l",
     0 -> (Nil -> NiL),

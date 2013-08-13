@@ -80,7 +80,7 @@ sealed trait Core[+V]{
 
   case class Lam[+V](arity: Byte, body: Scope[Byte, Core, V])                          extends Core[V]
   case class Let[+V](bindings: List[Scope[Byte, Core, V]], body: Scope[Byte, Core, V]) extends Core[V]
-  case class Case[+V](c: Core[V], branches: Map[Byte, Scope[Byte, Core, V]], default: Option[Scope[Unit, Core, V]]) extends Core[V]
+  case class Case[+V](c: Core[V], branches: Map[Byte, (Byte, Scope[Byte, Core, V])], default: Option[Scope[Unit, Core, V]]) extends Core[V]
   case class Dict[+V](supers: List[Core[V]], slots: List[Scope[Byte, Core, V]])       extends Core[V]
   case class LamDict[+V](body: Scope[Unit, Core, V])                                 extends Core[V]
   case class AppDict[+V](f: Core[V], d: Core[V])                                     extends Core[V]
@@ -120,7 +120,7 @@ object Core {
       case App(x, y)      => App(bind(x)(f), bind(y)(f))
       case Lam(n, e)      => Lam(n, e >>>= f)
       case Let(bs, e)     => Let(bs.map(s => s >>>= f), e >>>= f)
-      case Case(e, bs, d) => Case(bind(e)(f), bs.mapValues(a => a >>>= f), d.map(_ >>>= f))
+      case Case(e, bs, d) => Case(bind(e)(f), bs.mapValues{ case (b, a) => (b, a >>>= f) }, d.map(_ >>>= f))
       case Dict(xs, ys)   => Dict(xs.map(c => bind(c)(f)), ys.map(s => s >>>= f))
       case LamDict(e)     => LamDict(e >>>= f)
       case AppDict(x, y)  => AppDict(bind(x)(f), bind(y)(f))
@@ -142,7 +142,7 @@ object Core {
         case Let(bs, b)     => A.apply2(bs.traverse(traverseScope), b.traverse(f)(A, coreTraversable))(Let(_, _))
         case Case(e, bs, d) => A.apply3(
           traverse(e)(f),
-          bs.toList.traverse{ case (i, s) => traverseScope(s).map((i, _)) }.map(_.toMap),
+          bs.toList.traverse{ case (i, (b, s)) => traverseScope(s).map(a => (i, (b, a))) }.map(_.toMap),
           d.traverse(traverseScope)
         )(Case(_, _, _))
         case Dict(xs, ys)   => A.apply2(xs.traverse(traverse(_)(f)), ys.traverse(traverseScope))(Dict(_, _))

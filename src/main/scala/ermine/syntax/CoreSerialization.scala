@@ -61,11 +61,11 @@ object CoreSerialization {
     doubleR .map(LitDouble)
   ).erase
 
-  def branchesW[V,F](vw: Writer[V,F]): Writer[Map[Byte, Scope[Byte, Core, V]], DynamicF] =
-    streamW(tuple2W(byteW, scopeByteCoreVW(vw))).cmap((m:Map[Byte, Scope[Byte, Core, V]]) => m.toList).erase
+  def branchesW[V,F](vw: Writer[V,F]): Writer[Map[Byte, (Byte, Scope[Byte, Core, V])], DynamicF] =
+    streamW(tuple2W(byteW, tuple2W(byteW, scopeByteCoreVW(vw)))).cmap((m:Map[Byte, (Byte, Scope[Byte, Core, V])]) => m.toList).erase
 
-  def branchesR[V,F](vr: Reader[V,F]): Reader[Map[Byte, Scope[Byte, Core, V]], DynamicF] =
-    streamR(tuple2R(byteR, scopeByteCoreVR(vr))).map(_.toMap).erase
+  def branchesR[V,F](vr: Reader[V,F]): Reader[Map[Byte, (Byte, Scope[Byte, Core, V])], DynamicF] =
+    streamR(tuple2R(byteR, tuple2R(byteR, scopeByteCoreVR(vr)))).map(_.toMap).erase
 
   val coreW1: Writer1[Core] = new Writer1[Core] {
     def apply[A](aw: Writer[A, DynamicF]): Writer[Core[A], DynamicF] = coreW(aw)

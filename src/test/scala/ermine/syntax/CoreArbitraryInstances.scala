@@ -31,20 +31,38 @@ object CoreArbitraryInstances {
     size match {
       case 0 => oneOf(for { v <- av.arbitrary } yield Var(v), ArbitraryHardCore.arbitrary)
       case n => oneOf(
-        //        for { v <- av.arbitrary } yield Var(v),
+        for { v <- av.arbitrary } yield Var(v),
         ArbitraryHardCore.arbitrary,
-        for { tag <- arbitrary[Byte]; fields <- resize(arbitrary[List[Core[V]]]) } yield Data(tag, fields),
-        for { f <- resize(arbitrary[Core[V]]); x <- resize(arbitrary[Core[V]]) } yield App(f, x),
-        for { arity <- arbitrary[Byte]; body <- resize(arbitrary[Scope[Byte, Core, V]]) } yield Lam(arity, body),
-        for { bindings <- resize(arbitrary[List[Scope[Byte, Core, V]]]); body <- resize(arbitrary[Scope[Byte, Core, V]]) } yield Let(bindings, body),
+        for {
+          tag    <- arbitrary[Byte]
+          fields <- resize(arbitrary[List[Core[V]]])
+        } yield Data(tag, fields),
+        for {
+          f <- resize(arbitrary[Core[V]])
+          x <- resize(arbitrary[Core[V]])
+        } yield App(f, x),
+        for {
+          arity <- arbitrary[Byte]
+          body  <- resize(arbitrary[Scope[Byte, Core, V]])
+        } yield Lam(arity, body),
+        for {
+          bindings <- resize(arbitrary[List[Scope[Byte, Core, V]]])
+          body     <- resize(arbitrary[Scope[Byte, Core, V]])
+        } yield Let(bindings, body),
         for {
           c        <- resize(arbitrary[Core[V]])
-          branches <- resize(arbitrary[Map[Byte, Scope[Byte, Core, V]]])
+          branches <- resize(arbitrary[Map[Byte, (Byte, Scope[Byte, Core, V])]])
           default  <- resize(arbitrary[Option[Scope[Unit, Core, V]]])
         } yield Case(c, branches, default),
-        for { supers <- resize(arbitrary[Byte]); slots <- resize(arbitrary[List[Core[V]]]) } yield Data(supers, slots),
+        for {
+          supers <- resize(arbitrary[Byte])
+          slots  <- resize(arbitrary[List[Core[V]]])
+        } yield Data(supers, slots),
         for { body <- resize(arbitrary[Scope[Unit, Core, V]]) } yield LamDict(body),
-        for { f <- resize(arbitrary[Core[V]]); d <- resize(arbitrary[Core[V]]) } yield AppDict(f, d)
+        for {
+          f <- resize(arbitrary[Core[V]])
+          d <- resize(arbitrary[Core[V]])
+        } yield AppDict(f, d)
       )
     }
   })
