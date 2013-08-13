@@ -34,9 +34,7 @@ sealed trait HardCore extends Core[Nothing]
   case class LitDouble(d: Double)  extends Lit
 
 object HardCore {
-  implicit def hardcoreEqual: Equal[HardCore] = new Equal[HardCore] {
-    def equal(a: HardCore, b: HardCore) = a == b
-  }
+  implicit val hardcoreEqual: Equal[HardCore] = Equal.equalA[HardCore]
 }
 
 sealed trait Core[+V]{
@@ -91,7 +89,7 @@ sealed trait Core[+V]{
 
 object Core {
 
-  implicit def coreEqual[V](implicit VE: Equal[V]): Equal[Core[V]] = new Equal[Core[V]] {
+  implicit def coreEqual[V: Equal]: Equal[Core[V]] = new Equal[Core[V]] {
     def equal(a: Core[V], b: Core[V]): Boolean = (a, b) match {
       case (Var(v1), Var(v2)) => v1 === v2
       case (h1:HardCore, h2:HardCore) => h1 === h2
@@ -107,11 +105,11 @@ object Core {
     }
   }
 
-  implicit def coreEqual1: Equal1[Core] = new Equal1[Core] {
-    def equal[V](c1: Core[V], c2: Core[V])(implicit ve: Equal[V]) = c1 === c2
+  implicit val coreEqual1: Equal1[Core] = new Equal1[Core] {
+    def equal[V: Equal](c1: Core[V], c2: Core[V]) = c1 === c2
   }
 
-  implicit def coreMonad: Monad[Core] = new Monad[Core]{
+  implicit val coreMonad: Monad[Core] = new Monad[Core]{
     def point[A](a: => A) = Var(a)
     def bind[A,B](c: Core[A])(f: A => Core[B]): Core[B] = c match {
       case Var(a)         => f(a)
@@ -130,7 +128,7 @@ object Core {
     }
   }
 
-  def coreTraversable: Traverse[Core] = new Traverse[Core]{
+  val coreTraversable: Traverse[Core] = new Traverse[Core]{
     def traverseImpl[F[+_], A, B](exp : Core[A])(f : A => F[B])(implicit A: Applicative[F]) : F[Core[B]] = {
       def traverseScope[V](s: Scope[V, Core, A]) = s.traverse(f)(A, coreTraversable)
       exp match {
