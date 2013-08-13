@@ -7,7 +7,7 @@ import f0._
 import f0.Readers._
 import f0.Writers._
 import f0.DynamicF
-import scalaz.{Equal, Scalaz}
+import scalaz._
 import Scalaz._
 import CoreArbitraryInstances._
 import CoreSerialization._
@@ -16,7 +16,7 @@ object CoreSerializationTests extends ErmineProperties("CoreSerializationTests")
 
   test("core == put/get core")(clone(coreW(intW), coreR(intR)))
 
-  def clone[A,F](w: Writer[A,F], r: Reader[A,F])(implicit eql: Equal[A], arb: Arbitrary[A]): Prop =
+  def clone[A,F](w: f0.Writer[A,F], r: f0.Reader[A,F])(implicit eql: Equal[A], arb: Arbitrary[A]): Prop =
     forAll((a: A) => { r(w.toByteArray(a)) === a })
 }
 
@@ -26,29 +26,28 @@ object RoundTripTest extends ErmineProperties("RoundTripTest") {
 
   test("roundtrip")(forAll{(a: Core[Int]) => coreEchoExists ==> (callHaskellEcho(coreW(intW), coreR(intR))(a) === a)})
 
-  def callHaskellEcho[A, F](w: Writer[A,F], r: Reader[A,F])(aOut: A)(implicit eql: Equal[A], arb: Arbitrary[A]): A = {
+  def callHaskellEcho[A, F](w: f0.Writer[A,F], r: f0.Reader[A,F])(aOut: A)(implicit eql: Equal[A], arb: Arbitrary[A]): A = {
     import java.io._
-    println(s"\n$aOut\n")
-    new java.io.File("core.in.toString").delete
-    new PrintWriter("core.in.toString").println(aOut)
-    new File("core.in").delete
-    new File("core.out").delete
+    List(new File("core.in.toString"), new File("core.in"), new File("core.out")).foreach(_.delete)
+    // write the core to a file so that if it fails we have it around to paste back into code
+    val pw  = new PrintWriter("core.in.toString")
+    pw.println(aOut)
+    pw.close()
+    // serialize the Core[Int] out to a file.
     Sinks.toFile("core.in").using{ s => w.bind(s)(aOut) }
+    // call the haskell process that reads it in from core.in and spits it back out into core.out
     val p = Runtime.getRuntime.exec("../ermine/dist/build/core-echo/core-echo.exe")
+    // read all the output from the process or else it can get deadlocked due to laziness
+    scala.io.Source.fromInputStream(p.getInputStream).mkString
     p.waitFor
+    // read the Core[Int] back in from the file.
     Sources.fromFile("core.out")(r)
   }
 }
 
-//  val x: Core[Int] = Case(
-//    Data(1, List()),
-//    Map(1.toByte -> (0.toByte -> Scope(Let(List(),Scope(Slot(1)))))),
-//    Some(Scope(LitString("")))
-//  )
-//  test("x")(x === callHaskellEcho(coreW(intW), coreR(intR))(x))
 
 //test("roundtrip A")(coreEchoExists ==> (callHaskellEcho(hardcoreW, hardcoreR)(LitChar('A')) === LitChar('A')))
-//  def roundtrip[A,F](w: Writer[A,F], r: Reader[A,F])(implicit eql: Equal[A], arb: Arbitrary[A]): Prop = Prop(prms => {
+//  def roundtrip[A,F](w: f0.Writer[A,F], r: f0.Reader[A,F])(implicit eql: Equal[A], arb: Arbitrary[A]): Prop = Prop(prms => {
 //    def callHaskellEcho(aOut: A) = {
 //      println(aOut)
 //      Sinks.toFile("../ermine/core.in").using{ s => w.bind(s)(aOut) }
