@@ -24,16 +24,11 @@ object RoundTripTest extends ErmineProperties("RoundTripTest") {
 
   lazy val coreEchoExists = new java.io.File("../ermine/dist/build/core-echo/core-echo.exe").exists
 
-  test("roundtrip")(forAll{(a: Core[Int]) => coreEchoExists ==> (callHaskellEcho(coreW(intW), coreR(intR))(a) === a)})
+  test("roundtrip")(forAll{(a: Core[Int]) => echo(a) })
+  test("floats")(forAll{(f: Float) => echo(LitFloat(f))})
+  test("doubles")(forAll{(d: Double) => echo(LitDouble(d))})
 
-  // FAILING!
-  val x: Core[Int] =
-    LamDict(
-      Scope(Data(127, List(Var(\/-(Case(Lam(127.toByte,Scope(AppDict(Var(\/-(Slot(19))),Var(-\/(30))))),
-      Map(0.toByte -> (-128,Scope(Case(LamDict(Scope(LitByte(-128))), Map(127.toByte -> (0,Scope(LitInt(1418384156)))), Some(Scope(Var(-\/(()))))))),
-          1.toByte -> (0,Scope(AppDict(Var(-\/(1.toByte)),Data(-21, List()))))),
-      Some(Scope(App(AppDict(LitShort(8998),Super(97.toByte)), Let(List(), Scope(Var(\/-(LitFloat(-3.7079766E36.toFloat))))))))))), LitFloat(-2.3373122E37.toFloat)))))
-  test("x")(coreEchoExists ==> (x === callHaskellEcho(coreW(intW), coreR(intR))(x)))
+  def echo(c:Core[Int]) = coreEchoExists ==> (c === callHaskellEcho(coreW(intW), coreR(intR))(c))
 
   def callHaskellEcho[A, F](w: f0.Writer[A,F], r: f0.Reader[A,F])(aOut: A)(implicit eql: Equal[A], arb: Arbitrary[A]): A = {
     import java.io._
