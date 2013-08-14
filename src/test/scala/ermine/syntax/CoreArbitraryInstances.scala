@@ -66,4 +66,23 @@ object CoreArbitraryInstances {
       )
     }
   })
+
+  //def fromScope[F[+_], A, B](s : bound.Scope[B, F, A])(implicit evidence$20 : scalaz.Monad[F]) : F[bound.Var[B, A]]
+  //import bound._
+  //import Core._
+  implicit def shrinkCore[V](implicit s1: Shrink[V]): Shrink[Core[V]] = Shrink { c =>
+    c match {
+      case Var(_)               => Stream.empty
+      case h: HardCore          => Stream.empty
+      case App(f, x)            => Stream(f, x)
+      // case class Let[+V](bindings: List[Scope[Byte, Core, V]], body: Scope[Byte, Core, V])
+      case Let(bindings, body)  => Stream() // TODO: bindings, body
+      // case class Case[+V](c: Core[V], branches: Map[Byte, (Byte, Scope[Byte, Core, V])], default: Option[Scope[Unit, Core, V]])
+      case Case(c, branches, d) => Stream(c) // TODO: branches, default
+      case Data(tag, fields)    => fields.toStream
+      // case class LamDict[+V](body: Scope[Unit, Core, V])
+      case LamDict(body)        => Stream() // TODO: body
+      case AppDict(f, d)        => Stream(f, d)
+    }
+  }
 }

@@ -79,9 +79,9 @@ sealed trait Core[+V]{
   case class Lam[+V](arity: Byte, body: Scope[Byte, Core, V])                          extends Core[V]
   case class Let[+V](bindings: List[Scope[Byte, Core, V]], body: Scope[Byte, Core, V]) extends Core[V]
   case class Case[+V](c: Core[V], branches: Map[Byte, (Byte, Scope[Byte, Core, V])], default: Option[Scope[Unit, Core, V]]) extends Core[V]
-  case class Dict[+V](supers: List[Core[V]], slots: List[Scope[Byte, Core, V]])       extends Core[V]
-  case class LamDict[+V](body: Scope[Unit, Core, V])                                 extends Core[V]
-  case class AppDict[+V](f: Core[V], d: Core[V])                                     extends Core[V]
+  case class Dict[+V](supers: List[Core[V]], slots: List[Scope[Byte, Core, V]])        extends Core[V]
+  case class LamDict[+V](body: Scope[Unit, Core, V])                                   extends Core[V]
+  case class AppDict[+V](f: Core[V], d: Core[V])                                       extends Core[V]
 
   // hacks for prims
   case class PartialApp[+V](fun: Core[V], args: List[Core[V]]) extends Core[V]
