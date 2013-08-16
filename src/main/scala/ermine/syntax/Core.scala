@@ -128,6 +128,33 @@ object Core {
     }
   }
 
+  private def print(name: Cord, parts: Cord*): Cord = Cord(name, "(", Cord.mkCord(", ", parts: _*), ")")
+  implicit def coreShow[V: Show]: Show[Core[V]] = Show.show[Core[V]](_ match {
+    case Var(a)         => print("Var", a.show)
+    case Super(b)       => print("Super", b.show)
+    case Slot(b)        => print("Slot", b.show)
+    case Err(msg)       => print("Err", msg)
+    case LitInt(i)      => print("LitInt", i.show)
+    case LitInt64(l)    => print("LitInt64", l.show)
+    case LitByte(b)     => print("LitByte", b.show)
+    case LitShort(s)    => print("LitShort", s.show)
+    case LitString(s)   => print("LitString", s)
+    case LitChar(c)     => print("LitChar", c.show)
+    case LitFloat(f)    => print("LitFloat", f.show)
+    case LitDouble(d)   => print("LitDouble", d.show)
+    case Data(n, xs)    => print("Data", n.show, xs.show)
+    case App(x, y)      => print("App", x.show, y.show)
+    case Lam(n, e)      => print("Lam", n.show, e.show)
+    case Let(bs, e)     => print("Let", bs.show, e.show)
+    case Case(e, bs, d) => print("Case", bs.show, d.show)
+    case Dict(xs, ys)   => print("Dict", xs.show, ys.show)
+    case LamDict(e)     => print("LamDict", e.show)
+    case AppDict(x, y)  => print("AppDict", x.show, y.show)
+    // hacks for prims
+    case PartialApp(x, ys) => print("PartialApp", x.show, ys.show)
+    case PrimFun(a, b)  => print("PrimFun", a.show, b.toString)
+  })
+
   val coreTraversable: Traverse[Core] = new Traverse[Core]{
     def traverseImpl[F[+_], A, B](exp : Core[A])(f : A => F[B])(implicit A: Applicative[F]) : F[Core[B]] = {
       def traverseScope[V](s: Scope[V, Core, A]) = s.traverse(f)(A, coreTraversable)
