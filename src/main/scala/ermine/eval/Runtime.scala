@@ -1,5 +1,7 @@
 package ermine.eval
 
+import ermine.syntax.Core
+
 /**
  * Common supertype of all runtime values.
  */
@@ -63,8 +65,9 @@ case class Evaluated(e: Runtime) extends ThunkState
  * writebacks should be performed at all, for situations in which sharing
  * is unnecessary.
  */
-class Thunk(var state: ThunkState, val update: Boolean) extends Runtime {
+class Thunk(var state: ThunkState, val update: Boolean) extends Runtime
 
 object Thunk {
-  def apply(r: Runtime, update: Boolean) = new Thunk(Delayed(r), update)
+  def apply[V](env: Map[V, Runtime], e: Core[V], update: Boolean) =
+    new Thunk(Delayed(env, e), update)
 }
