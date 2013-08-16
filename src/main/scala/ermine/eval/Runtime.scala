@@ -35,6 +35,8 @@ case class PartialApp(func: Runtime, args: List[Runtime]) extends Runtime
  */
 case class Data(tag: Byte, fields: List[Runtime]) extends Runtime
 
+case class Evidence(supers: List[Runtime], slots: List[Runtime]) extends Runtime
+
 /**
  * Detectable non-termination, such as exceptions.
  */
@@ -99,13 +101,30 @@ object Eval {
   @annotation.tailrec
   final def eval(env: Env, core: Core[Address], stk: List[Runtime] = Nil): Runtime = core match {
     case Var(a)            => appl(env.getOrElse(a, panic(s"bad variable reference $a")), stk)
-    case Super(b)          => ???
-    case Slot(b)           => ???
+    case Super(b)          => stk match {
+      case Evidence(sups, _) :: rest => appl(sups(b.toInt), rest)
+      case x :: _ => panic(s"Super applied to non-dictionary $x")
+      case Nil => Func(1, { case List(Evidence(sups, _)) => sups(b.toInt) })
+    }
+    case Slot(b)          => stk match {
+      case Evidence(_, slots) :: rest => appl(slots(b.toInt), rest)
+      case (x :: _) => panic(s"Slot applied to non-dictionary $x")
+      case Nil => Func(1, { case List(Evidence(_, slots)) => slots(b.toInt) })
+    }
     case Err(msg)          => Bottom(sys.error(msg))
     case l: Lit            => appl(Prim(l.extract), stk)
     case CoreData(tag, cs) => appl(Data(tag, cs.map(Thunk(env, _, true))), stk)
     case App(x, y)         => eval(env, x, Thunk(env, y, true) :: stk)
-    case Lam(n, e)         => appl(Func(n, evalLam(env, e)), stk)
+    case Lam(n, e)         =>
+      // this case doesn't use java stack
+      if(stk.length >= n) stk.splitAt(n.toInt) match {
+        case (args, rest) =>
+          val addrs = args.map(_ => new Address)
+          val newEnv = addrs.zip(args).toMap ++ env
+          eval(newEnv, e.instantiate(b => Var(addrs(b.toInt))), rest)
+      }
+      // TODO: this case does...
+      else appl(Func(n, evalLam(env, e)(_.toInt)), stk)
     case Let(bs, e)     =>
       var newEnv : Env = null
       val addrs = bs.map(_ => new Address)
@@ -115,16 +134,32 @@ object Eval {
     case Case(e, bs, d) =>
       val (body, aug) = pickBranch(env, e, bs, d)
       eval(env ++ aug, body, stk)
-    case Dict(xs, ys)   => ???
-    case LamDict(e)     => ???
-    case AppDict(x, y)  => ???
+    case Dict(xs, ys)   => appl(buildDict(env, xs, ys), stk)
+    case LamDict(e)     => stk match {
+      case Nil => Func(1, evalLam(env, e)(_ => 0))
+      case dict :: rest =>
+        val addr = new Address
+        eval(env + (addr -> dict), e.instantiate(_ => Var(addr)), rest)
+    }
+    case AppDict(x, y)  =>  eval(env, x, evalDict(env, y) :: stk)
     case _ => ???
   }
 
-  private def evalLam(env: Env, s:Scope[Byte, Core, Address]): List[Runtime] => Runtime = l => {
+  def buildDict(env: Env, supers: List[Core[Address]], slots: List[Scope[Byte, Core, Address]]) = {
+    val esupers = supers.map(eval(env, _))
+    var newEnv : Env = null
+    val slotAddrs = slots.map(_ => new Address)
+    val eslots = slots.map(b => Thunk(newEnv, b.instantiate(i => Var(slotAddrs(i))), true))
+    newEnv = env ++ slotAddrs.zip(eslots).toMap
+    Evidence(esupers, eslots)
+  }
+
+  def evalDict(env: Env, y: Core[Address]) = eval(env, y)
+
+  private def evalLam[T](env: Env, s:Scope[T, Core, Address])(f: T => Int): List[Runtime] => Runtime = l => {
     val addrs = l.map(_ => new Address)
     val newEnv = addrs.zip(l).toMap ++ env
-    eval(newEnv, s.instantiate(b => Var(addrs(b.toInt))))
+    eval(newEnv, s.instantiate(b => Var(addrs(f(b)))))
   }
 
   private def pickBranch(env: Env, c: Core[Address],
