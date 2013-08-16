@@ -23,15 +23,28 @@ sealed trait HardCore extends Core[Nothing]
   case class Super(b: Byte)        extends HardCore
   case class Slot (b: Byte)        extends HardCore
   case class Err  (msg: String)    extends HardCore
-  sealed trait Lit extends HardCore
-  case class LitInt   (i: Int)     extends Lit
-  case class LitInt64 (l: Long)    extends Lit
-  case class LitByte  (b: Byte)    extends Lit
-  case class LitShort (s: Short)   extends Lit
-  case class LitString(s: String)  extends Lit
-  case class LitChar  (c: Char)    extends Lit
-  case class LitFloat (f: Float)   extends Lit
-  case class LitDouble(d: Double)  extends Lit
+  sealed trait Lit extends HardCore { def extract: Any }
+  case class LitInt   (extract: Int)     extends Lit
+  case class LitInt64 (extract: Long)    extends Lit
+  case class LitByte  (extract: Byte)    extends Lit
+  case class LitShort (extract: Short)   extends Lit
+  case class LitString(extract: String)  extends Lit
+  case class LitChar  (extract: Char)    extends Lit
+  case class LitFloat (extract: Float)   extends Lit
+  case class LitDouble(extract: Double)  extends Lit
+
+  object ForiegnFunc {
+    def apply(className: String, methodName: String): ForiegnFunc = {
+      // todo: maybe catch an error here if class is not found
+      val c = Class.forName(className)
+      val m = c.getMethods.find(_.getName == methodName).getOrElse(sys.error(s"no such method $className.$methodName"))
+      new ForiegnFunc(m)
+    }
+  }
+
+  case class ForiegnFunc(method: java.lang.reflect.Method) extends HardCore {
+    lazy val arity = method.getParameterTypes
+  }
 
 object HardCore {
   implicit val hardcoreEqual: Equal[HardCore] = Equal.equalA[HardCore]

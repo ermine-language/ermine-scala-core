@@ -1,6 +1,14 @@
 package ermine.eval
 
-import ermine.syntax.Core
+import bound.Scope
+import ermine.syntax.{Data => CoreData, _}
+
+/**
+ * A type of addresses, to be used as unique identifiers in an environment map.
+ */
+class Address
+
+import Eval.Env
 
 /**
  * Common supertype of all runtime values.
@@ -40,7 +48,17 @@ object Bottom {
 }
 
 abstract class ThunkState
-case class Delayed[V](env: Map[V, Runtime], e: Core[V]) extends ThunkState
+class Delayed(env: => Env, val core: Core[Address]) extends ThunkState {
+  def getEnv = env
+}
+
+object Delayed {
+  def apply(env: => Env, e: Core[Address]) = new Delayed(env, e)
+  def unapply(e: ThunkState): Option[(Env, Core[Address])] = e match {
+    case d : Delayed => Some((d.getEnv, d.core))
+    case _           => None
+  }
+}
 
 /**
  * Black holes are used to temporarily replace thunk states during
@@ -68,6 +86,99 @@ case class Evaluated(e: Runtime) extends ThunkState
 class Thunk(var state: ThunkState, val update: Boolean) extends Runtime
 
 object Thunk {
-  def apply[V](env: Map[V, Runtime], e: Core[V], update: Boolean) =
+  def apply(env: => Env, e: Core[Address], update: Boolean) =
     new Thunk(Delayed(env, e), update)
+}
+
+case class Prim(p: Any) extends Runtime
+
+
+object Eval {
+  type Env = Map[Address, Runtime]
+
+  @annotation.tailrec
+  final def eval(env: Env, core: Core[Address], stk: List[Runtime] = Nil): Runtime = core match {
+    case Var(a)            => appl(env.getOrElse(a, panic(s"bad variable reference $a")), stk)
+    case Super(b)          => ???
+    case Slot(b)           => ???
+    case Err(msg)          => Bottom(sys.error(msg))
+    case l: Lit            => appl(Prim(l.extract), stk)
+    case CoreData(tag, cs) => appl(Data(tag, cs.map(Thunk(env, _, true))), stk)
+    case App(x, y)         => eval(env, x, Thunk(env, y, true) :: stk)
+    case Lam(n, e)         => appl(Func(n, evalLam(env, e)), stk)
+    case Let(bs, e)     =>
+      var newEnv : Env = null
+      val addrs = bs.map(_ => new Address)
+      val ibs = bs.map(b => b.instantiate(i => Var(addrs(i))))
+      newEnv = env ++ addrs.zip(ibs).map { case (addr, b) => addr -> Thunk(newEnv, b, true) }
+      eval(newEnv, e.instantiate(i => Var(addrs(i))), stk)
+    case Case(e, bs, d) =>
+      val (body, aug) = pickBranch(env, e, bs, d)
+      eval(env ++ aug, body, stk)
+    case Dict(xs, ys)   => ???
+    case LamDict(e)     => ???
+    case AppDict(x, y)  => ???
+    case _ => ???
+  }
+
+  private def evalLam(env: Env, s:Scope[Byte, Core, Address]): List[Runtime] => Runtime = l => {
+    val addrs = l.map(_ => new Address)
+    val newEnv = addrs.zip(l).toMap ++ env
+    eval(newEnv, s.instantiate(b => Var(addrs(b.toInt))))
+  }
+
+  private def pickBranch(env: Env, c: Core[Address],
+                         branches: Map[Byte, (Byte, Scope[Byte, Core, Address])],
+                         default: Option[Scope[Unit, Core, Address]]): (Core[Address], Env) = whnf(eval(env, c)) match {
+    case d@Data(tag, fields) =>
+      val addr = new Address
+      branches.get(tag) match {
+        case Some((_, body)) =>
+          val addrs = fields.map(_ => new Address)
+          (body.instantiate(b => Var((addr :: addrs)(b.toInt))), ((addr,d) :: addrs.zip(fields)).toMap)
+        case None => default match {
+          case Some(body) => (body.instantiate(_ => Var(addr)), Map(addr -> d))
+          case None       => panic("non-exhaustive case statement without default")
+        }
+      }
+    case _ => ???
+  }
+
+  @annotation.tailrec
+  private def appl(v: Runtime, stk: List[Runtime]): Runtime = stk match {
+    case Nil => v
+    case a :: stkp => whnf(v) match {
+      case t : Thunk                   => sys.error("PANIC: whnf returned thunk")
+      case b : Bottom                  => b
+      case Func(arity, f)              =>
+        if(stk.length < arity) PartialApp(v, stk)
+        else {
+          val (args, rest) = stk.splitAt(arity)
+          appl(f(args), rest)
+        }
+      case PartialApp(f, args)         => appl(f, args ++ stk)
+      case Prim(f : Function1[Any, _]) => ??? // appl(Prim(f(a.extract)), stkp)
+      case f                           => panic(s"Cannot apply runtime value $f to $a")
+    }
+  }
+
+  @annotation.tailrec
+  final def whnf(r: Runtime, chain: List[Thunk] = Nil): Runtime = r match {
+    case t: Thunk => t.state match {
+      case Delayed(env, c) => whnf(eval(env, c), t :: chain)
+      case BlackHole       => writeback(Bottom(sys.error("infinite loop detected")), chain)
+      case Evaluated(r)    => writeback(r, chain)
+    }
+    case _ => writeback(r, chain)
+  }
+
+  @annotation.tailrec
+  private def writeback(answer: Runtime, chain: List[Thunk]): Runtime = chain match {
+    case t :: ts =>
+      t.state = Evaluated(answer)
+      writeback(answer, ts)
+    case Nil => answer
+  }
+
+  def panic(msg: String) = sys.error(s"PANIC: $msg")
 }
