@@ -137,7 +137,9 @@ trait CoreInterpExampleHelpers {
 
   // combinator for building case statements
   def cases(c: Core[String], branches: (Int, (List[String], Core[String]))*): Case[String] = Case(
-    c, branches.toMap.mapKeys(_.toByte).mapValues{ case (vars, cr) => ((0:Byte), abstrakt(cr)(indexWhere(_, vars))) }, None
+    c, branches.toMap.mapKeys(_.toByte).mapValues{
+      case (vars, cr) => ((0:Byte), abstrakt(cr)(indexWhere(_, vars).map((x:Byte) => (x + 1).toByte)))
+    }, None
   )
 
   def caseIgnoreArity[V](c: Core[V], branches: Map[Byte, Scope[Byte, Core, V]], default: Option[Scope[Unit, Core, V]]): Case[V] =
@@ -327,6 +329,7 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
 
   val ShowBoolList = ShowList(ShowBool)
   val ShowIntList  = ShowList(ShowInt)
+  def showBoolList(c: Core[String]) = (AppDict(Slot(0), v"ShowBoolList")) * c
   def showIntList(c: Core[String]) = (AppDict(Slot(0), v"ShowIntList")) * c
 
   val If = "t" !: "x" !: "y" !: cases(eqb(v"t", True), 0 -> (Nil -> v"x"), 1 -> (Nil -> v"y"))
@@ -377,8 +380,9 @@ object CoreInterpExampleWithData extends CoreInterpExampleHelpers {
   , ("ListMonad", ListMonad)
   , ("oneThroughThree", v"Cons" * LitInt(1) * (v"Cons" * LitInt(2) * (v"Cons" * LitInt(3) * NiL)))
   , ("oneThroughFive",  v"Cons" * LitInt(1) * (v"Cons" * LitInt(2) * (v"Cons" * LitInt(3) * (v"Cons" * LitInt(4) * (v"Cons" * LitInt(5) * NiL)))))
-  ),
-  showIntList((AppDict(Slot(1), v"ListMonad")) * v"oneThroughFive" * ("x" !: (v"replicate" * v"x" * v"x")))
+  ,("ttff", v"Cons" * v"True" * (v"Cons" * v"True" * (v"Cons" * v"False" * (v"Cons" * v"False" * NiL))))
+  ), showBoolList(v"ttff")
+  //showIntList((AppDict(Slot(1), v"ListMonad")) * v"oneThroughFive" * ("x" !: (v"replicate" * v"x" * v"x")))
 //  showIntList(v"intersperse" * LitInt(7) * (v"map" * (v"+" * LitInt(2)) * (v"take" * LitInt(10) * v"ones")))
 //  v"if" * v"True" * v"one" * v"one"
 //  showBool(eqb(v"True", (v"snd" * (v"Pair" * v"one" * v"False"))))

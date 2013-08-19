@@ -101,20 +101,27 @@ object Eval {
   @annotation.tailrec
   final def eval(env: Env, core: Core[Address], stk: List[Runtime] = Nil): Runtime = core match {
     case Var(a)            => appl(env.getOrElse(a, panic(s"bad variable reference $a")), stk)
+
     case Super(b)          => stk match {
       case Evidence(sups, _) :: rest => appl(sups(b.toInt), rest)
       case x :: _ => panic(s"Super applied to non-dictionary $x")
       case Nil => Func(1, { case List(Evidence(sups, _)) => sups(b.toInt) })
     }
+
     case Slot(b)          => stk match {
       case Evidence(_, slots) :: rest => appl(slots(b.toInt), rest)
       case (x :: _) => panic(s"Slot applied to non-dictionary $x")
       case Nil => Func(1, { case List(Evidence(_, slots)) => slots(b.toInt) })
     }
+
     case Err(msg)          => Bottom(sys.error(msg))
+
     case l: Lit            => appl(Prim(l.extract), stk)
+
     case CoreData(tag, cs) => appl(Data(tag, cs.map(Thunk(env, _, true))), stk)
+
     case App(x, y)         => eval(env, x, Thunk(env, y, true) :: stk)
+
     case Lam(n, e)         =>
       // this case doesn't use java stack
       if(stk.length >= n) stk.splitAt(n.toInt) match {
@@ -125,23 +132,29 @@ object Eval {
       }
       // TODO: this case does...
       else appl(Func(n, evalLam(env, e)(_.toInt)), stk)
+
     case Let(bs, e)     =>
       var newEnv : Env = null
       val addrs = bs.map(_ => new Address)
       val ibs = bs.map(b => b.instantiate(i => Var(addrs(i))))
       newEnv = env ++ addrs.zip(ibs).map { case (addr, b) => addr -> Thunk(newEnv, b, true) }
       eval(newEnv, e.instantiate(i => Var(addrs(i))), stk)
+
     case Case(e, bs, d) =>
       val (body, aug) = pickBranch(env, e, bs, d)
       eval(env ++ aug, body, stk)
+
     case Dict(xs, ys)   => appl(buildDict(env, xs, ys), stk)
+
     case LamDict(e)     => stk match {
       case Nil => Func(1, evalLam(env, e)(_ => 0))
       case dict :: rest =>
         val addr = new Address
         eval(env + (addr -> dict), e.instantiate(_ => Var(addr)), rest)
     }
+
     case AppDict(x, y)  =>  eval(env, x, evalDict(env, y) :: stk)
+
     case _ => ???
   }
 
@@ -154,7 +167,7 @@ object Eval {
     Evidence(esupers, eslots)
   }
 
-  def evalDict(env: Env, y: Core[Address]) = eval(env, y)
+  def evalDict(env: Env, y: Core[Address]) = whnf(eval(env, y))
 
   private def evalLam[T](env: Env, s:Scope[T, Core, Address])(f: T => Int): List[Runtime] => Runtime = l => {
     val addrs = l.map(_ => new Address)
