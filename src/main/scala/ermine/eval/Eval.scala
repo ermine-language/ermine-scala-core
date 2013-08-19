@@ -65,13 +65,15 @@ object Eval {
 
     case AppDict(x, y)  =>  eval(env, x, evalDict(env, y) :: stk)
 
-    case f@ForiegnFunc(m) => Func(f.arity, args => {
+    case f@ForiegnFunc(m) => appl(Func(f.arity, args => {
       val evaledArgs = args.map(a => whnf(a) match {
         case Prim(e) => e.asInstanceOf[AnyRef]
         case _ => panic("Non-Prim in invocation of ForiegnFunc.")
       })
       Prim(m.invoke(null, evaledArgs:_*))
-    })
+    }), stk)
+
+    case PrimOp(name) => appl(PrimOps.primOpDefs(name), stk)
   }
 
   def buildDict(env: Env, supers: List[Core[Address]], slots: List[Scope[Byte, Core, Address]]) = {
@@ -105,7 +107,7 @@ object Eval {
           case None       => panic("non-exhaustive case statement without default")
         }
       }
-    case _ => ???
+    case x => panic(s"pick branch is confused: $x : ${x.getClass}")
   }
 
   @annotation.tailrec

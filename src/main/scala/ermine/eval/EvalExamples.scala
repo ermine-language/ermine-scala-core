@@ -7,34 +7,34 @@ import ermine.syntax.{ Data => CoreData }
 import bound._
 import Core._
 
-object EvalExampleWithDataAndTypeClasses extends CoreInterpExampleHelpers {
-  import CoreInterp._
+object EvalExamples extends CoreCombinators {
 
   // Booleans
-  val True:  Core[String] = CoreData(0, Nil)
-  val False: Core[String] = CoreData(1, Nil)
+  val False: Core[String] = CoreData(0, Nil)
+  val True:  Core[String] = CoreData(1, Nil)
 
   // Pair
   val Pair = "l" !: "r" !: CoreData(0, List(v"l", v"r"))
-  val Fst  = "p" !: caseIgnoreArity(v"p", Map(0.toByte -> Scope(Var(B(0.toByte)))), None)
-  val Snd  = "p" !: caseIgnoreArity(v"p", Map(0.toByte -> Scope(Var(B(1.toByte)))), None)
+  val Fst = "p" !: cases(v"p", (0, (List("a", "b"), v"a")))
+  val Snd = "p" !: cases(v"p", (0, (List("a", "b"), v"b")))
 
   // List
   val NiL: Core[String]  = CoreData(0, Nil)
   val Cons  = "head" !: "tail" !: CoreData(1, List(v"head", v"tail"))
-  val Head  = "l" !: caseIgnoreArity(v"l", Map(0.toByte -> Scope(Err("Can't get the head of Nil")), 1.toByte -> Scope(Var(B(0.toByte)))), None)
-  val Tail  = "l" !: caseIgnoreArity(v"l", Map(0.toByte -> Scope(Err("Can't get the tail of Nil")), 1.toByte -> Scope(Var(B(1.toByte)))), None)
+
+  val Head = "l" !: cases(v"l", (0, (List(), Err("Can't get the head of Nil"))), (1, (List("a", "rest"), v"a")))
+  val Tail = "l" !: cases(v"l", (0, (List(), Err("Can't get the head of Nil"))), (1, (List("a", "rest"), v"rest")))
   val Empty = "l" !: cases(v"l", 0 -> (Nil -> True), 1 -> (Nil -> False))
   def singleton(a: Core[String]) = v"Cons" * a * NiL
 
-//  val Take  = "n" !: "xs" !:
-//    v"if" * eqInt(v"n", LitInt(0)) * NiL * cases(v"xs",
-//      0 -> (Nil -> NiL),
-//      1 -> (List("h", "t") -> v"Cons" * v"h" * (v"take" * (v"-" * v"n" * LitInt(1)) * v"t"))
-//    )
-//
-//  val Replicate  = "n" !: "a" !:
-//    v"if" * eqInt(v"n", LitInt(0)) * NiL * (v"Cons" * v"a" * (v"replicate" * (v"-" * v"n" * LitInt(1)) * v"a"))
+  val Take  = "n" !: "xs" !:
+    v"if" * eqInt(v"n", LitInt(0)) * NiL * cases(v"xs",
+      0 -> (Nil -> NiL),
+      1 -> (List("h", "t") -> v"Cons" * v"h" * (v"take" * (v"-" * v"n" * LitInt(1)) * v"t"))
+    )
+
+  val Replicate  = "n" !: "a" !:
+    v"if" * eqInt(v"n", LitInt(0)) * NiL * (v"Cons" * v"a" * (v"replicate" * (v"-" * v"n" * LitInt(1)) * v"a"))
 
   val ListMap = "f" !: "l" !: cases(v"l",
     0 -> (Nil -> NiL),
@@ -63,6 +63,7 @@ object EvalExampleWithDataAndTypeClasses extends CoreInterpExampleHelpers {
 
   // ones = 1 : ones
   val Ones = v"Cons" * LitInt(1) * v"ones"
+  val Nats = v"Cons" * LitInt(0) * (v"map" * (v"+" * v"one") * v"nats")
 
   // Dictionaries
   val EqBool = dict(
@@ -73,7 +74,7 @@ object EvalExampleWithDataAndTypeClasses extends CoreInterpExampleHelpers {
   )
   def eqb(a:Core[String], b: Core[String]) = AppDict(Slot(0), v"EqBool") * a * b
   val ShowBool = dict(
-    "show" -> ("b" !: cases(v"b", 0 -> (Nil -> LitString("True")), 1 -> (Nil -> LitString("False"))))
+    "show" -> ("b" !: cases(v"b", 0 -> (Nil -> LitString("False")), 1 -> (Nil -> LitString("True"))))
   )
   def showBool(c: Core[String]) = AppDict(Slot(0), v"ShowBool") * c
   val ShowInt = dict("show" -> ("i" !: v"stringValueOfInt" * v"i"))
@@ -81,6 +82,9 @@ object EvalExampleWithDataAndTypeClasses extends CoreInterpExampleHelpers {
     0 -> (Nil -> LitString("")),
     1 -> (List("x", "xs") -> v"stringAppend" * v"x" * (v"joinStringList" * v"xs"))
   )
+
+  val EqInt = dict("==" -> ("a" !: "b" !: (PrimOp("eqInt") * v"a" * v"b")))
+  def eqInt(a:Core[String], b: Core[String]) = AppDict(Slot(0), v"EqInt") * a * b
 
   def ShowList(sup: Dict[String]): Dict[String] = dict(
     "show" -> ("l" !: cases(v"intersperse" * LitString(",") * (v"map" * AppDict(Slot(0), sup) * v"l"),
@@ -91,9 +95,9 @@ object EvalExampleWithDataAndTypeClasses extends CoreInterpExampleHelpers {
   val ShowBoolList = ShowList(ShowBool)
   val ShowIntList  = ShowList(ShowInt)
   def showBoolList(c: Core[String]) = AppDict(Slot(0), v"ShowBoolList") * c
-  def showIntList(c: Core[String]) = (AppDict(Slot(0), v"ShowIntList")) * c
+  def showIntList(c: Core[String]) = AppDict(Slot(0), v"ShowIntList") * c
 
-  val If = "t" !: "x" !: "y" !: cases(eqb(v"t", True), 0 -> (Nil -> v"x"), 1 -> (Nil -> v"y"))
+  val If = "t" !: "x" !: "y" !: cases(eqb(v"t", True), 0 -> (Nil -> v"y"), 1 -> (Nil -> v"x"))
 
   val ListFunctor = dict("fmap" -> ListMap)
   val ListAp      = dict(
@@ -105,16 +109,7 @@ object EvalExampleWithDataAndTypeClasses extends CoreInterpExampleHelpers {
     ">>="  -> ("xs" !: "f" !: (v"concat" * (v"map" * v"f" * v"xs")))
   )
 
-  val stringAppendAddr = new Address
-  val stringAppend : Runtime = Func(2, { case List(pre, post) => (Eval.whnf(pre), Eval.whnf(post)) match {
-    case (Prim(x : String), Prim(y : String)) => Prim(x + y)
-    case _ => sys.error("no.")
-  }})
-
-  def resolveTopLevel(s: String): Address = s match {
-    case "stringAppend" => stringAppendAddr
-  }
-  def cooked(c:Core[String]) = let_(List(
+  def cooked(c:Core[String]) = closed(let_(List(
     ("False",    False)
   , ("True",     True)
   , ("one",      LitInt(1))
@@ -124,7 +119,10 @@ object EvalExampleWithDataAndTypeClasses extends CoreInterpExampleHelpers {
   , ("joinStringList", JoinStringList)
   , ("EqBool",   EqBool)
   , ("ShowBool", ShowBool)
-  //, ("EqInt",    EqInt)
+  , ("EqInt", EqInt)
+  , ("stringAppend", PrimOp("stringAppend"))
+  , ("-", PrimOp("minusInt"))
+  , ("+", PrimOp("plusInt"))
   , ("ShowInt",  ShowInt)
   , ("Nil",      NiL)
   , ("Cons",     Cons)
@@ -136,29 +134,29 @@ object EvalExampleWithDataAndTypeClasses extends CoreInterpExampleHelpers {
   , ("map",      ListMap)
   , ("prependToAll", PrependToAll)
   , ("intersperse" , Intersperse)
-  //, ("replicate" , Replicate)
+  , ("replicate" , Replicate)
   , ("ones",     Ones)
+  , ("nats",     Nats)
   , ("if",       If)
-  //, ("take",     Take)
+  , ("take",     Take)
   , ("append",   ListAppend)
   , ("concat",   ListConcat)
   , ("ListMonad", ListMonad)
   , ("stringValueOfInt", ForiegnFunc("java.lang.String", "valueOf", List("int")))
   ), c
-  ).map(resolveTopLevel)
+  )).get
 
-  val initialEnv : Map[Address,Runtime] = Map(
-    stringAppendAddr -> stringAppend
-  )
-  val StringAppend = PrimFun(2, (args:List[Core[String]]) => (nf(args(0)), nf(args(1))) match {
-      case (LitString(x), LitString(y)) => LitString(x + y)
-      case e => Err(s"Error in args to stringAppend: $e")
-    })
   def main(args: Array[String]){
-    println(Eval.whnf(Eval.eval(initialEnv, cooked(showBoolList(v"Cons" * v"True" * (v"Cons" * v"True" * (v"Cons" * v"False" * (v"Cons" * v"False" * NiL))))))))
-    println(Eval.whnf(Eval.eval(initialEnv, cooked(v"stringValueOfInt" * v"one"))))
-    println(Eval.whnf(Eval.eval(initialEnv, cooked(
-      showIntList(v"Cons" * LitInt(50) * (v"Cons" * LitInt(1000) * (v"Cons" * LitInt(1) * (v"Cons" * v"one" * NiL)))))))
+    def go(c:Core[String]) = println(Eval.whnf(Eval.eval(Map(), cooked(c))))
+    go(showBoolList(v"Cons" * v"True" * (v"Cons" * v"True" * (v"Cons" * v"False" * (v"Cons" * v"False" * NiL)))))
+    go(v"stringValueOfInt" * v"one")
+    go(cooked(showIntList(v"Cons" * LitInt(50) * (v"Cons" * LitInt(1000) * (v"Cons" * LitInt(1) * (v"Cons" * v"one" * NiL))))))
+    go(showIntList(v"take" * LitInt(5) * v"ones"))
+    go(showIntList(AppDict(Slot(1), v"ListMonad") *
+      (v"take" * LitInt(5) * v"nats") * ("x" !: (v"replicate" * v"x" * v"x")))
     )
+    go(showIntList(v"intersperse" * LitInt(7) * (v"map" * (v"+" * LitInt(2)) * (v"take" * LitInt(10) * v"ones"))))
+    go(v"if" * v"True" * v"one" * v"one")
+    go(showBool(eqb(v"True", v"snd" * (v"Pair" * v"one" * v"False"))))
   }
 }

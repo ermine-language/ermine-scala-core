@@ -111,5 +111,6 @@ object Thunk {
 }
 
 case class Prim(p: Any) extends Runtime {
+  override def toString = s"Prim($p : ${p.getClass})"
   def render = toString
 }

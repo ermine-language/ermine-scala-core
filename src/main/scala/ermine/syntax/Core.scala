@@ -57,6 +57,8 @@ sealed trait HardCore extends Core[Nothing]
     lazy val arity = method.getParameterTypes.length.toByte
   }
 
+  case class PrimOp(name: String) extends HardCore
+
 object HardCore {
   implicit val hardcoreEqual: Equal[HardCore] = Equal.equalA[HardCore]
 }
