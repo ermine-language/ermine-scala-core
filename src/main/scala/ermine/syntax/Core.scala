@@ -34,16 +34,27 @@ sealed trait HardCore extends Core[Nothing]
   case class LitDouble(extract: Double)  extends Lit
 
   object ForiegnFunc {
-    def apply(className: String, methodName: String): ForiegnFunc = {
-      // todo: maybe catch an error here if class is not found
+    def apply(className: String, methodName: String, argumentTypes: List[String]): ForiegnFunc = {
+      // TODO: maybe catch an error here if class is not found
+      def getClassFor(name: String): Class[_] = name match {
+        case "boolean" => classOf[Boolean]
+        case "byte"    => classOf[Byte]
+        case "char"    => classOf[Char]
+        case "short"   => classOf[Short]
+        case "int"     => classOf[Int]
+        case "long"    => classOf[Long]
+        case "float"   => classOf[Float]
+        case "double"  => classOf[Double]
+        case "void"    => java.lang.Void.TYPE
+        case _         => Class.forName(name)
+      }
       val c = Class.forName(className)
-      val m = c.getMethods.find(_.getName == methodName).getOrElse(sys.error(s"no such method $className.$methodName"))
-      new ForiegnFunc(m)
+      new ForiegnFunc(c.getMethod(methodName, argumentTypes.map(getClassFor):_*))
     }
   }
 
   case class ForiegnFunc(method: java.lang.reflect.Method) extends HardCore {
-    lazy val arity = method.getParameterTypes
+    lazy val arity = method.getParameterTypes.length.toByte
   }
 
 object HardCore {

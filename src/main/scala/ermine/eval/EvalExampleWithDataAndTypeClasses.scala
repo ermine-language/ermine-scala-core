@@ -76,7 +76,7 @@ object EvalExampleWithDataAndTypeClasses extends CoreInterpExampleHelpers {
     "show" -> ("b" !: cases(v"b", 0 -> (Nil -> LitString("True")), 1 -> (Nil -> LitString("False"))))
   )
   def showBool(c: Core[String]) = AppDict(Slot(0), v"ShowBool") * c
-
+  val ShowInt = dict("show" -> ("i" !: v"stringValueOfInt" * v"i"))
   val JoinStringList = "l" !: cases(v"l",
     0 -> (Nil -> LitString("")),
     1 -> (List("x", "xs") -> v"stringAppend" * v"x" * (v"joinStringList" * v"xs"))
@@ -89,8 +89,9 @@ object EvalExampleWithDataAndTypeClasses extends CoreInterpExampleHelpers {
   ))).copy(supers=List(sup))
 
   val ShowBoolList = ShowList(ShowBool)
-  //val ShowIntList  = ShowList(ShowInt)
-  //def showIntList(c: Core[String]) = (AppDict(Slot(0), v"ShowIntList")) * c
+  val ShowIntList  = ShowList(ShowInt)
+  def showBoolList(c: Core[String]) = AppDict(Slot(0), v"ShowBoolList") * c
+  def showIntList(c: Core[String]) = (AppDict(Slot(0), v"ShowIntList")) * c
 
   val If = "t" !: "x" !: "y" !: cases(eqb(v"t", True), 0 -> (Nil -> v"x"), 1 -> (Nil -> v"y"))
 
@@ -104,8 +105,6 @@ object EvalExampleWithDataAndTypeClasses extends CoreInterpExampleHelpers {
     ">>="  -> ("xs" !: "f" !: (v"concat" * (v"map" * v"f" * v"xs")))
   )
 
-  def showBoolList(c: Core[String]) = AppDict(Slot(0), v"ShowBoolList") * c
-
   val stringAppendAddr = new Address
   val stringAppend : Runtime = Func(2, { case List(pre, post) => (Eval.whnf(pre), Eval.whnf(post)) match {
     case (Prim(x : String), Prim(y : String)) => Prim(x + y)
@@ -115,7 +114,7 @@ object EvalExampleWithDataAndTypeClasses extends CoreInterpExampleHelpers {
   def resolveTopLevel(s: String): Address = s match {
     case "stringAppend" => stringAppendAddr
   }
-  val cooked = let_(List(
+  def cooked(c:Core[String]) = let_(List(
     ("False",    False)
   , ("True",     True)
   , ("one",      LitInt(1))
@@ -126,11 +125,11 @@ object EvalExampleWithDataAndTypeClasses extends CoreInterpExampleHelpers {
   , ("EqBool",   EqBool)
   , ("ShowBool", ShowBool)
   //, ("EqInt",    EqInt)
-  //, ("ShowInt",  ShowInt)
+  , ("ShowInt",  ShowInt)
   , ("Nil",      NiL)
   , ("Cons",     Cons)
   , ("ShowBoolList", ShowBoolList)
-  //, ("ShowIntList" , ShowIntList)
+  , ("ShowIntList" , ShowIntList)
   , ("head",     Head)
   , ("tail",     Tail)
   , ("empty",    Empty)
@@ -144,10 +143,9 @@ object EvalExampleWithDataAndTypeClasses extends CoreInterpExampleHelpers {
   , ("append",   ListAppend)
   , ("concat",   ListConcat)
   , ("ListMonad", ListMonad)
-  , ("ttff", v"Cons" * v"True" * (v"Cons" * v"True" * (v"Cons" * v"False" * (v"Cons" * v"False" * NiL))))
-  ), showBoolList(v"ttff")
+  , ("stringValueOfInt", ForiegnFunc("java.lang.String", "valueOf", List("int")))
+  ), c
   ).map(resolveTopLevel)
-
 
   val initialEnv : Map[Address,Runtime] = Map(
     stringAppendAddr -> stringAppend
@@ -157,6 +155,10 @@ object EvalExampleWithDataAndTypeClasses extends CoreInterpExampleHelpers {
       case e => Err(s"Error in args to stringAppend: $e")
     })
   def main(args: Array[String]){
-    println(Eval.whnf(Eval.eval(initialEnv, cooked)))
+    println(Eval.whnf(Eval.eval(initialEnv, cooked(showBoolList(v"Cons" * v"True" * (v"Cons" * v"True" * (v"Cons" * v"False" * (v"Cons" * v"False" * NiL))))))))
+    println(Eval.whnf(Eval.eval(initialEnv, cooked(v"stringValueOfInt" * v"one"))))
+    println(Eval.whnf(Eval.eval(initialEnv, cooked(
+      showIntList(v"Cons" * LitInt(50) * (v"Cons" * LitInt(1000) * (v"Cons" * LitInt(1) * (v"Cons" * v"one" * NiL)))))))
+    )
   }
 }
