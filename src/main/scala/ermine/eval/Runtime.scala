@@ -10,10 +10,14 @@ class Address
 
 import Eval.Env
 
+case class Death(error: String, base: Exception = null) extends Exception(error, base)
+
 /**
  * Common supertype of all runtime values.
  */
-sealed abstract class Runtime
+sealed abstract class Runtime {
+  def render: String
+}
 
 /**
  * This constructor may be used to represent both compiled lambda
@@ -21,27 +25,36 @@ sealed abstract class Runtime
  * appropriately wrapped, of course). Functions may take multiple
  * arguments at a time, and are able to report their arity.
  */
-case class Func(arity: Byte, body: List[Runtime] => Runtime) extends Runtime
+case class Func(arity: Byte, body: List[Runtime] => Runtime) extends Runtime {
+  def render = s"<Func $arity>"
+}
 
 /**
  * Since function arity is not necessarily 1, we may encounter a situation
  * in which we don't have enough arguments to call a function yet. This
  * represents a suspended application for such a situation.
  */
-case class PartialApp(func: Runtime, args: List[Runtime]) extends Runtime
+case class PartialApp(func: Runtime, args: List[Runtime]) extends Runtime {
+  def render = s"${func.render}{${args.map(_.render).mkString("; ")}}"
+}
 
 /**
  * Representation of data type constructors.
  */
-case class Data(tag: Byte, fields: List[Runtime]) extends Runtime
+case class Data(tag: Byte, fields: List[Runtime]) extends Runtime {
+  def render = s"<$tag>[${fields.map(_.render).mkString(",")}]"
+}
 
-case class Evidence(supers: List[Runtime], slots: List[Runtime]) extends Runtime
+case class Evidence(supers: List[Runtime], slots: List[Runtime]) extends Runtime {
+  def render = "<Evidence>"
+}
 
 /**
  * Detectable non-termination, such as exceptions.
  */
 class Bottom(msg: => Nothing) extends Runtime {
   def inspect = msg
+  def render = try { msg } catch { case Death(str, _) => s"<exception: $str>" }
 }
 
 object Bottom {
@@ -85,18 +98,24 @@ case class Evaluated(e: Runtime) extends ThunkState
  * writebacks should be performed at all, for situations in which sharing
  * is unnecessary.
  */
-class Thunk(var state: ThunkState, val update: Boolean) extends Runtime
+class Thunk(var state: ThunkState, val update: Boolean) extends Runtime {
+  def render = Eval.whnf(this).render
+}
 
 object Thunk {
   def apply(env: => Env, e: Core[Address], update: Boolean) =
     new Thunk(Delayed(env, e), update)
 }
 
-case class Prim(p: Any) extends Runtime
+case class Prim(p: Any) extends Runtime {
+  def render = toString
+}
 
 
 object Eval {
   type Env = Map[Address, Runtime]
+
+  def die(msg: String) = throw Death(msg)
 
   @annotation.tailrec
   final def eval(env: Env, core: Core[Address], stk: List[Runtime] = Nil): Runtime = core match {
@@ -114,7 +133,7 @@ object Eval {
       case Nil => Func(1, { case List(Evidence(_, slots)) => slots(b.toInt) })
     }
 
-    case Err(msg)          => Bottom(sys.error(msg))
+    case Err(msg)          => Bottom(die(msg))
 
     case l: Lit            => appl(Prim(l.extract), stk)
 
