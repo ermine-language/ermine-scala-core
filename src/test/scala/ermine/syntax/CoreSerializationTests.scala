@@ -1,4 +1,5 @@
-package ermine.syntax
+package ermine
+package syntax
 
 import bound._
 import org.scalacheck.{Prop, Arbitrary}

@@ -1,4 +1,5 @@
-package ermine.syntax
+package ermine
+package syntax
 
 import scalaz.{Equal, Scalaz}
 import Scalaz._
@@ -16,7 +17,3 @@ object CoreTests extends ErmineProperties("Core Tests"){
   def eqls[A](a: Core[A], b: Core[A])(implicit eql: Equal[Core[A]]) = eql.equal(a, b)
 }
 
-abstract class ErmineProperties(name: String) extends Properties(name){
-  def test(name:String)(f: => Prop) = property(name) = secure { trying(f) }
-  def trying(f: => Prop) = try f catch { case e: java.lang.Throwable  => e.printStackTrace(System.err); throw e }
-}

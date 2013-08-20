@@ -1,13 +1,13 @@
-package ermine.eval
+package ermine
+package eval
 
 import scalaz._
 import Scalaz._
 import ermine.syntax._
 import ermine.syntax.{ Data => CoreData }
-import bound._
 import Core._
 
-object EvalExamples extends CoreCombinators {
+object EvalExamples extends ErmineProperties("CoreSerializationTests") with CoreCombinators {
 
   // Booleans
   val False: Core[String] = CoreData(0, Nil)
@@ -146,17 +146,48 @@ object EvalExamples extends CoreCombinators {
   ), c
   )).get
 
-  def main(args: Array[String]){
-    def go(c:Core[String]) = println(Eval.whnf(Eval.eval(Map(), cooked(c))))
-    go(showBoolList(v"Cons" * v"True" * (v"Cons" * v"True" * (v"Cons" * v"False" * (v"Cons" * v"False" * NiL)))))
-    go(v"stringValueOfInt" * v"one")
-    go(cooked(showIntList(v"Cons" * LitInt(50) * (v"Cons" * LitInt(1000) * (v"Cons" * LitInt(1) * (v"Cons" * v"one" * NiL))))))
-    go(showIntList(v"take" * LitInt(5) * v"ones"))
-    go(showIntList(AppDict(Slot(1), v"ListMonad") *
-      (v"take" * LitInt(5) * v"nats") * ("x" !: (v"replicate" * v"x" * v"x")))
-    )
-    go(showIntList(v"intersperse" * LitInt(7) * (v"map" * (v"+" * LitInt(2)) * (v"take" * LitInt(10) * v"ones"))))
-    go(v"if" * v"True" * v"one" * v"one")
-    go(showBool(eqb(v"True", v"snd" * (v"Pair" * v"one" * v"False"))))
-  }
+  def evalTest(name: String, c:Core[String], expectedResult:Prim) = test(name)(
+    Eval.whnf(Eval.eval(Map(), cooked(c))) == expectedResult
+  )
+
+  evalTest(
+    "show bool list",
+    showBoolList(v"Cons" * v"True" * (v"Cons" * v"True" * (v"Cons" * v"False" * (v"Cons" * v"False" * NiL)))),
+    Prim("[True,True,False,False]")
+  )
+  evalTest(
+    "stringValueOfInt",
+    v"stringValueOfInt" * v"one",
+    Prim("1")
+  )
+  evalTest(
+    "show int list",
+    showIntList(v"Cons" * LitInt(50) * (v"Cons" * LitInt(1000) * (v"Cons" * LitInt(1) * (v"Cons" * v"one" * NiL)))),
+    Prim("[50,1000,1,1]")
+  )
+  evalTest(
+    "take",
+    showIntList(v"take" * LitInt(5) * v"ones"),
+    Prim("[1,1,1,1,1]")
+  )
+  evalTest(
+    "list monad",
+    showIntList(AppDict(Slot(1), v"ListMonad") * (v"take" * LitInt(5) * v"nats") * ("x" !: (v"replicate" * v"x" * v"x"))),
+    Prim("[1,2,2,3,3,3,4,4,4,4]")
+  )
+  evalTest(
+    "intersperse",
+    showIntList(v"intersperse" * LitInt(7) * (v"map" * (v"+" * LitInt(2)) * (v"take" * LitInt(10) * v"ones"))),
+    Prim("[3,7,3,7,3,7,3,7,3,7,3,7,3,7,3,7,3,7,3]")
+  )
+  evalTest(
+    "if",
+    v"if" * v"True" * v"one" * v"one",
+    Prim(1)
+  )
+  evalTest(
+    "pair",
+    showBool(eqb(v"True", v"snd" * (v"Pair" * v"one" * v"False"))),
+    Prim("False")
+  )
 }
