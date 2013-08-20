@@ -1,13 +1,11 @@
 package ermine
 package syntax
 
-import bound._
 import org.scalacheck.{Prop, Arbitrary}
 import org.scalacheck.Prop._
 import f0._
 import f0.Readers._
 import f0.Writers._
-import f0.DynamicF
 import scalaz._
 import Scalaz._
 import CoreArbitraryInstances._

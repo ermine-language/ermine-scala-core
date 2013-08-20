@@ -1,7 +1,6 @@
 package ermine.eval
 
-import bound.Scope
-import ermine.syntax.{Data => CoreData, _}
+import ermine.syntax._
 import Runtime.Env
 
 /**
