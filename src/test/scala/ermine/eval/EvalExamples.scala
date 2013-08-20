@@ -119,10 +119,10 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   , ("joinStringList", JoinStringList)
   , ("EqBool",   EqBool)
   , ("ShowBool", ShowBool)
-  , ("EqInt", EqInt)
+  , ("EqInt",    EqInt)
   , ("stringAppend", PrimOp("stringAppend"))
-  , ("-", PrimOp("minusInt"))
-  , ("+", PrimOp("plusInt"))
+  , ("-",        PrimOp("minusInt"))
+  , ("+",        PrimOp("plusInt"))
   , ("ShowInt",  ShowInt)
   , ("Nil",      NiL)
   , ("Cons",     Cons)
@@ -134,15 +134,21 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   , ("map",      ListMap)
   , ("prependToAll", PrependToAll)
   , ("intersperse" , Intersperse)
-  , ("replicate" , Replicate)
-  , ("ones",     Ones)
-  , ("nats",     Nats)
-  , ("if",       If)
-  , ("take",     Take)
-  , ("append",   ListAppend)
-  , ("concat",   ListConcat)
+  , ("replicate",    Replicate)
+  , ("ones",      Ones)
+  , ("nats",      Nats)
+  , ("if",        If)
+  , ("take",      Take)
+  , ("append",    ListAppend)
+  , ("concat",    ListConcat)
   , ("ListMonad", ListMonad)
-  , ("stringValueOfInt", ForiegnFunc("java.lang.String", "valueOf", List("int")))
+  , ("stringValueOfInt", ForiegnMethod(static=true, "java.lang.String", "valueOf", List("int")))
+  , ("now",         ForiegnConstructor("java.util.Date", Nil))
+  , ("emptyString", ForiegnConstructor("java.lang.String", Nil))
+  , ("stringCopy" , ForiegnConstructor("java.lang.String", List("java.lang.String")))
+  , ("toLowerCase", ForiegnMethod(static=false, "java.lang.String", "toLowerCase", Nil))
+  , ("replaceChar", ForiegnMethod(static=false, "java.lang.String", "replace", List("char", "char")))
+  , ("pi", ForiegnValue(static=true, "java.lang.Math", "PI"))
   ), c
   )).get
 
@@ -189,5 +195,15 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
     "pair",
     showBool(eqb(v"True", v"snd" * (v"Pair" * v"one" * v"False"))),
     Prim("False")
+  )
+  evalTest("constructor with no args",    v"emptyString", Prim(""))
+  evalTest("constructor with args",       v"stringCopy" * LitString("cartman"), Prim("cartman"))
+  evalTest("instance function,  no args", v"toLowerCase" * LitString("CartMan"), Prim("cartman"))
+  evalTest("instance function with args", v"replaceChar" * LitString("F*CK") * LitChar('*') * LitChar('!'), Prim("F!CK"))
+  evalTest("static value", v"pi", Prim(math.Pi))
+  evalTest(
+    "instance value",
+    ForiegnValue(static=false, "ermine.eval.Dummy", "x") * ForiegnConstructor("ermine.eval.Dummy", Nil),
+    Prim(5)
   )
 }

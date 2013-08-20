@@ -65,15 +65,42 @@ object Eval {
 
     case AppDict(x, y)  =>  eval(env, x, evalDict(env, y) :: stk)
 
-    case f@ForiegnFunc(m) => appl(Func(f.arity, args => {
-      val evaledArgs = args.map(a => whnf(a) match {
-        case Prim(e) => e.asInstanceOf[AnyRef]
-        case _ => panic("Non-Prim in invocation of ForiegnFunc.")
-      })
-      Prim(m.invoke(null, evaledArgs:_*))
-    }), stk)
-
     case PrimOp(name) => appl(PrimOps.primOpDefs(name), stk)
+
+    case f@ForiegnMethod(static, m) => {
+      def mk: Runtime =
+        Func((f.arity + (if(static) 0 else 1)).toByte, args => {
+          val evaledArgs = args.map(a => whnf(a) match {
+            case Prim(e) => e.asInstanceOf[AnyRef]
+            case _ => panic("Non-Prim in invocation of ForeignMethod.")
+          })
+          if (static)
+            Prim(m.invoke(null, evaledArgs:_*))
+          else
+            Prim(m.invoke(evaledArgs.head, evaledArgs.tail:_*))
+        })
+      if (static && f.arity == 0) appl(Prim(m.invoke(null)), stk)
+      else appl(mk, stk)
+    }
+
+    case f@ForiegnConstructor(c) =>
+      if(f.arity == 0) appl(Prim(c.newInstance()), stk)
+      else appl(Func(f.arity, args => {
+        val evaledArgs = args.map(a => whnf(a) match {
+          case Prim(e) => e.asInstanceOf[AnyRef]
+          case _ => panic("Non-Prim in invocation of ForiegnConstructor.")
+        })
+        Prim(c.newInstance(evaledArgs:_*))
+      }), stk)
+
+    case f@ForiegnValue(static, field) =>
+      if(static) appl(Prim(field.get(null)), stk)
+      else appl(Func(1, args => args match {
+        case List(x) => whnf(x) match {
+          case Prim(e) => Prim(field.get(e.asInstanceOf[AnyRef]))
+          case _ => panic("Non-Prim in invocation of ForiegnValue.")
+        }
+      }), stk)
   }
 
   def buildDict(env: Env, supers: List[Core[Address]], slots: List[Scope[Byte, Core, Address]]) = {

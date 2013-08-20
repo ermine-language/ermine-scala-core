@@ -5,6 +5,23 @@ import bound.Scope._
 import scalaz._
 import Scalaz._
 
+object Native {
+  def getClassFor(name: String): Class[_] = name match {
+    case "boolean" => classOf[Boolean]
+    case "byte"    => classOf[Byte]
+    case "char"    => classOf[Char]
+    case "short"   => classOf[Short]
+    case "int"     => classOf[Int]
+    case "long"    => classOf[Long]
+    case "float"   => classOf[Float]
+    case "double"  => classOf[Double]
+    case "void"    => java.lang.Void.TYPE
+    case _         => Class.forName(name)
+  }
+}
+
+import Native._
+
 /**
 data Core a
   = Var a
@@ -33,31 +50,37 @@ sealed trait HardCore extends Core[Nothing]
   case class LitFloat (extract: Float)   extends Lit
   case class LitDouble(extract: Double)  extends Lit
 
-  object ForiegnFunc {
-    def apply(className: String, methodName: String, argumentTypes: List[String]): ForiegnFunc = {
+  case class PrimOp(name: String) extends HardCore
+
+  object ForiegnMethod {
+    def apply(static: Boolean, className: String, methodName: String, argumentTypes: List[String]): ForiegnMethod = {
       // TODO: maybe catch an error here if class is not found
-      def getClassFor(name: String): Class[_] = name match {
-        case "boolean" => classOf[Boolean]
-        case "byte"    => classOf[Byte]
-        case "char"    => classOf[Char]
-        case "short"   => classOf[Short]
-        case "int"     => classOf[Int]
-        case "long"    => classOf[Long]
-        case "float"   => classOf[Float]
-        case "double"  => classOf[Double]
-        case "void"    => java.lang.Void.TYPE
-        case _         => Class.forName(name)
-      }
-      val c = Class.forName(className)
-      new ForiegnFunc(c.getMethod(methodName, argumentTypes.map(getClassFor):_*))
+      new ForiegnMethod(static, Class.forName(className).getMethod(methodName, argumentTypes.map(getClassFor):_*))
     }
   }
 
-  case class ForiegnFunc(method: java.lang.reflect.Method) extends HardCore {
+  case class ForiegnMethod(static: Boolean, method: java.lang.reflect.Method) extends HardCore {
     lazy val arity = method.getParameterTypes.length.toByte
   }
 
-  case class PrimOp(name: String) extends HardCore
+  object ForiegnConstructor {
+    def apply(className: String, argumentTypes: List[String]): HardCore = {
+      // TODO: maybe catch an error here if class is not found
+      new ForiegnConstructor(Class.forName(className).getConstructor(argumentTypes.map(getClassFor):_*))
+    }
+  }
+
+  case class ForiegnConstructor[T](c: java.lang.reflect.Constructor[T]) extends HardCore {
+    lazy val arity = c.getParameterTypes.length.toByte
+  }
+
+  object ForiegnValue {
+    def apply(static: Boolean, className: String, fieldName: String): ForiegnValue =
+      ForiegnValue(static, Class.forName(className).getField(fieldName))
+  }
+
+  case class ForiegnValue(static: Boolean, f: java.lang.reflect.Field) extends HardCore
+
 
 object HardCore {
   implicit val hardcoreEqual: Equal[HardCore] = Equal.equalA[HardCore]

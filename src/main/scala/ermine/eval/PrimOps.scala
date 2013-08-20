@@ -4,10 +4,17 @@ import Eval.panic
 
 object PrimOps {
   def primOpDefs: Map[String, Runtime] = Map (
+    "eqString"     -> primOp((s1 : String, s2 : String) => s1 == s2),
     "stringAppend" -> primOp((s1 : String, s2 : String) => s1 + s2),
+
+    "eqChar"       -> primOp((s1 : Char, s2 : Char) => s1 == s2),
+
     "eqInt"        -> primOp((i1 : Int, i2 : Int) => i1 == i2),
     "minusInt"     -> primOp((i1 : Int, i2 : Int) => i1 - i2),
-    "plusInt"      -> primOp((i1 : Int, i2 : Int) => i1 + i2)
+    "plusInt"      -> primOp((i1 : Int, i2 : Int) => i1 + i2),
+    "multInt"      -> primOp((i1 : Int, i2 : Int) => i1 * i2),
+    "divInt"       -> primOp((i1 : Int, i2 : Int) => i1 / i2),
+    "modInt"       -> primOp((i1 : Int, i2 : Int) => i1 % i2)
   )
 
   def adjustBooleans(a: Any) = a match {
