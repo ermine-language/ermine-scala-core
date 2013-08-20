@@ -67,7 +67,7 @@ object Eval {
 
     case PrimOp(name) => appl(PrimOps.primOpDefs(name), stk)
 
-    case f@ForiegnMethod(static, m) => {
+    case f@ForiegnMethod(static, _, _, _) => {
       def mk: Runtime =
         Func((f.arity + (if(static) 0 else 1)).toByte, args => {
           val evaledArgs = args.map(a => whnf(a) match {
@@ -75,29 +75,29 @@ object Eval {
             case _ => panic("Non-Prim in invocation of ForeignMethod.")
           })
           if (static)
-            Prim(m.invoke(null, evaledArgs:_*))
+            Prim(f.method.invoke(null, evaledArgs:_*))
           else
-            Prim(m.invoke(evaledArgs.head, evaledArgs.tail:_*))
+            Prim(f.method.invoke(evaledArgs.head, evaledArgs.tail:_*))
         })
-      if (static && f.arity == 0) appl(Prim(m.invoke(null)), stk)
+      if (static && f.arity == 0) appl(Prim(f.method.invoke(null)), stk)
       else appl(mk, stk)
     }
 
-    case f@ForiegnConstructor(c) =>
-      if(f.arity == 0) appl(Prim(c.newInstance()), stk)
+    case f@ForiegnConstructor(_, _) =>
+      if(f.arity == 0) appl(Prim(f.con.newInstance()), stk)
       else appl(Func(f.arity, args => {
         val evaledArgs = args.map(a => whnf(a) match {
           case Prim(e) => e.asInstanceOf[AnyRef]
           case _ => panic("Non-Prim in invocation of ForiegnConstructor.")
         })
-        Prim(c.newInstance(evaledArgs:_*))
+        Prim(f.con.newInstance(evaledArgs:_*))
       }), stk)
 
-    case f@ForiegnValue(static, field) =>
-      if(static) appl(Prim(field.get(null)), stk)
+    case f@ForiegnValue(static, _, _) =>
+      if(static) appl(Prim(f.field.get(null)), stk)
       else appl(Func(1, args => args match {
         case List(x) => whnf(x) match {
-          case Prim(e) => Prim(field.get(e.asInstanceOf[AnyRef]))
+          case Prim(e) => Prim(f.field.get(e.asInstanceOf[AnyRef]))
           case _ => panic("Non-Prim in invocation of ForiegnValue.")
         }
       }), stk)

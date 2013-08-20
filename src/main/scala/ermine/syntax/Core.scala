@@ -52,34 +52,22 @@ sealed trait HardCore extends Core[Nothing]
 
   case class PrimOp(name: String) extends HardCore
 
-  object ForiegnMethod {
-    def apply(static: Boolean, className: String, methodName: String, argumentTypes: List[String]): ForiegnMethod = {
-      // TODO: maybe catch an error here if class is not found
-      new ForiegnMethod(static, Class.forName(className).getMethod(methodName, argumentTypes.map(getClassFor):_*))
-    }
-  }
-
-  case class ForiegnMethod(static: Boolean, method: java.lang.reflect.Method) extends HardCore {
+  case class ForiegnMethod(static: Boolean, className: String, methodName: String, argumentTypes: List[String]) extends HardCore {
+    // TODO: maybe catch an error here if class is not found
+    lazy val method = Class.forName(className).getMethod(methodName, argumentTypes.map(getClassFor):_*)
     lazy val arity = method.getParameterTypes.length.toByte
   }
 
-  object ForiegnConstructor {
-    def apply(className: String, argumentTypes: List[String]): HardCore = {
-      // TODO: maybe catch an error here if class is not found
-      new ForiegnConstructor(Class.forName(className).getConstructor(argumentTypes.map(getClassFor):_*))
-    }
+  case class ForiegnConstructor(className: String, argumentTypes: List[String]) extends HardCore {
+    // TODO: maybe catch an error here if class is not found
+    lazy val con: java.lang.reflect.Constructor[_] = Class.forName(className).getConstructor(argumentTypes.map(getClassFor):_*)
+    lazy val arity = con.getParameterTypes.length.toByte
   }
 
-  case class ForiegnConstructor[T](c: java.lang.reflect.Constructor[T]) extends HardCore {
-    lazy val arity = c.getParameterTypes.length.toByte
+  case class ForiegnValue(static: Boolean, className: String, fieldName: String) extends HardCore {
+    // TODO: maybe catch an error here if class is not found
+    lazy val field: java.lang.reflect.Field = Class.forName(className).getField(fieldName)
   }
-
-  object ForiegnValue {
-    def apply(static: Boolean, className: String, fieldName: String): ForiegnValue =
-      ForiegnValue(static, Class.forName(className).getField(fieldName))
-  }
-
-  case class ForiegnValue(static: Boolean, f: java.lang.reflect.Field) extends HardCore
 
 
 object HardCore {
