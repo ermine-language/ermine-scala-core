@@ -51,6 +51,8 @@ trait CoreCombinators {
     def !:(s:String) = lam[String, Core](s)(e)
   }
 
+  implicit def intToLitInt(i:Int) = LitInt(i)
+
   def closed[A, B](fa:Core[A]): Option[Core[B]] = {
     implicit val x = Core.coreTraversable
     fa.traverse(Function.const(None))

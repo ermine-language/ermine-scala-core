@@ -15,26 +15,25 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
 
   // Pair
   val Pair = "l" !: "r" !: CoreData(0, List(v"l", v"r"))
-  val Fst = "p" !: cases(v"p", (0, (List("a", "b"), v"a")))
-  val Snd = "p" !: cases(v"p", (0, (List("a", "b"), v"b")))
+  val Fst =  "p" !: cases(v"p", (0, (List("a", "b"), v"a")))
+  val Snd =  "p" !: cases(v"p", (0, (List("a", "b"), v"b")))
 
   // List
   val NiL: Core[String]  = CoreData(0, Nil)
   val Cons  = "head" !: "tail" !: CoreData(1, List(v"head", v"tail"))
-
-  val Head = "l" !: cases(v"l", (0, (List(), Err("Can't get the head of Nil"))), (1, (List("a", "rest"), v"a")))
-  val Tail = "l" !: cases(v"l", (0, (List(), Err("Can't get the head of Nil"))), (1, (List("a", "rest"), v"rest")))
+  val Head  = "l" !: cases(v"l", (0, (List(), Err("Can't get the head of Nil"))), (1, (List("a", "rest"), v"a")))
+  val Tail  = "l" !: cases(v"l", (0, (List(), Err("Can't get the head of Nil"))), (1, (List("a", "rest"), v"rest")))
   val Empty = "l" !: cases(v"l", 0 -> (Nil -> True), 1 -> (Nil -> False))
-  def singleton(a: Core[String]) = v"Cons" * a * NiL
+  def mkList(input:Core[String]*) = input.foldRight(NiL){ (c, acc) => v"Cons" * c * acc }
 
   val Take  = "n" !: "xs" !:
-    v"if" * eqInt(v"n", LitInt(0)) * NiL * cases(v"xs",
+    v"if" * eqInt(v"n", 0) * NiL * cases(v"xs",
       0 -> (Nil -> NiL),
-      1 -> (List("h", "t") -> v"Cons" * v"h" * (v"take" * (v"-" * v"n" * LitInt(1)) * v"t"))
+      1 -> (List("h", "t") -> v"Cons" * v"h" * (v"take" * (v"-" * v"n" * 1) * v"t"))
     )
 
   val Replicate  = "n" !: "a" !:
-    v"if" * eqInt(v"n", LitInt(0)) * NiL * (v"Cons" * v"a" * (v"replicate" * (v"-" * v"n" * LitInt(1)) * v"a"))
+    v"if" * eqInt(v"n", 0) * NiL * (v"Cons" * v"a" * (v"replicate" * (v"-" * v"n" * 1) * v"a"))
 
   val ListMap = "f" !: "l" !: cases(v"l",
     0 -> (Nil -> NiL),
@@ -62,8 +61,8 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   ))
 
   // ones = 1 : ones
-  val Ones = v"Cons" * LitInt(1) * v"ones"
-  val Nats = v"Cons" * LitInt(0) * (v"map" * (v"+" * v"one") * v"nats")
+  val Ones = v"Cons" * 1 * v"ones"
+  val Nats = v"Cons" * 0 * (v"map" * (v"+" * v"one") * v"nats")
 
   // Dictionaries
   val EqBool = dict(
@@ -95,17 +94,17 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   val ShowBoolList = ShowList(ShowBool)
   val ShowIntList  = ShowList(ShowInt)
   def showBoolList(c: Core[String]) = AppDict(Slot(0), v"ShowBoolList") * c
-  def showIntList(c: Core[String]) = AppDict(Slot(0), v"ShowIntList") * c
+  def showIntList(c: Core[String])  = AppDict(Slot(0), v"ShowIntList")  * c
 
   val If = "t" !: "x" !: "y" !: cases(eqb(v"t", True), 0 -> (Nil -> v"y"), 1 -> (Nil -> v"x"))
 
   val ListFunctor = dict("fmap" -> ListMap)
   val ListAp      = dict(
-    "pure" -> ("a" !: singleton(v"a")),
+    "pure" -> ("a" !: mkList(v"a")),
     "<*>"  -> ("f" !: "a" !: (v"concat" * (v"map" * ("x" !: (v"map" * ("y" !: v"x" * v"y")) * v"f") * v"a")))
   )
   val ListMonad   = dict(
-    "unit" -> ("a" !: singleton(v"a")),
+    "unit" -> ("a" !: mkList(v"a")),
     ">>="  -> ("xs" !: "f" !: (v"concat" * (v"map" * v"f" * v"xs")))
   )
 
@@ -148,7 +147,7 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   , ("stringCopy" , ForiegnConstructor("java.lang.String", List("java.lang.String")))
   , ("toLowerCase", ForiegnMethod(static=false, "java.lang.String", "toLowerCase", Nil))
   , ("replaceChar", ForiegnMethod(static=false, "java.lang.String", "replace", List("char", "char")))
-  , ("pi", ForiegnValue(static=true, "java.lang.Math", "PI"))
+  , ("pi",          ForiegnValue(static=true, "java.lang.Math", "PI"))
   ), c
   )).get
 
@@ -158,44 +157,24 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
 
   evalTest(
     "show bool list",
-    showBoolList(v"Cons" * v"True" * (v"Cons" * v"True" * (v"Cons" * v"False" * (v"Cons" * v"False" * NiL)))),
+    showBoolList(mkList(v"True", v"True", v"False", v"False")),
     Prim("[True,True,False,False]")
   )
-  evalTest(
-    "stringValueOfInt",
-    v"stringValueOfInt" * v"one",
-    Prim("1")
-  )
-  evalTest(
-    "show int list",
-    showIntList(v"Cons" * LitInt(50) * (v"Cons" * LitInt(1000) * (v"Cons" * LitInt(1) * (v"Cons" * v"one" * NiL)))),
-    Prim("[50,1000,1,1]")
-  )
-  evalTest(
-    "take",
-    showIntList(v"take" * LitInt(5) * v"ones"),
-    Prim("[1,1,1,1,1]")
-  )
+  evalTest("stringValueOfInt", v"stringValueOfInt" * v"one", Prim("1"))
+  evalTest("show int list", showIntList(mkList(50, 1000, 1, v"one")), Prim("[50,1000,1,1]"))
+  evalTest("take", showIntList(v"take" * 5 * v"ones"), Prim("[1,1,1,1,1]"))
   evalTest(
     "list monad",
-    showIntList(AppDict(Slot(1), v"ListMonad") * (v"take" * LitInt(5) * v"nats") * ("x" !: (v"replicate" * v"x" * v"x"))),
+    showIntList(AppDict(Slot(1), v"ListMonad") * (v"take" * 5 * v"nats") * ("x" !: (v"replicate" * v"x" * v"x"))),
     Prim("[1,2,2,3,3,3,4,4,4,4]")
   )
   evalTest(
     "intersperse",
-    showIntList(v"intersperse" * LitInt(7) * (v"map" * (v"+" * LitInt(2)) * (v"take" * LitInt(10) * v"ones"))),
+    showIntList(v"intersperse" * 7 * (v"map" * (v"+" * 2) * (v"take" * 10 * v"ones"))),
     Prim("[3,7,3,7,3,7,3,7,3,7,3,7,3,7,3,7,3,7,3]")
   )
-  evalTest(
-    "if",
-    v"if" * v"True" * v"one" * v"one",
-    Prim(1)
-  )
-  evalTest(
-    "pair",
-    showBool(eqb(v"True", v"snd" * (v"Pair" * v"one" * v"False"))),
-    Prim("False")
-  )
+  evalTest("if", v"if" * v"True" * v"one" * v"one", Prim(1))
+  evalTest("pair", showBool(eqb(v"True", v"snd" * (v"Pair" * v"one" * v"False"))), Prim("False"))
   evalTest("constructor with no args",    v"emptyString", Prim(""))
   evalTest("constructor with args",       v"stringCopy" * LitString("cartman"), Prim("cartman"))
   evalTest("instance function,  no args", v"toLowerCase" * LitString("CartMan"), Prim("cartman"))
