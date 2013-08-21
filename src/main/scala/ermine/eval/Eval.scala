@@ -67,7 +67,7 @@ object Eval {
 
     case PrimOp(name) => appl(PrimOps.primOpDefs(name), stk)
 
-    case f@ForiegnMethod(static, _, _, _) => {
+    case f@ForeignMethod(static, _, _, _) => {
       def mk: Runtime =
         Func((f.arity + (if(static) 0 else 1)).toByte, args => {
           val evaledArgs = args.map(a => whnf(a) match {
@@ -83,7 +83,7 @@ object Eval {
       else appl(mk, stk)
     }
 
-    case f@ForiegnConstructor(_, _) =>
+    case f@ForeignConstructor(_, _) =>
       if(f.arity == 0) appl(Prim(f.con.newInstance()), stk)
       else appl(Func(f.arity, args => {
         val evaledArgs = args.map(a => whnf(a) match {
@@ -93,7 +93,7 @@ object Eval {
         Prim(f.con.newInstance(evaledArgs:_*))
       }), stk)
 
-    case f@ForiegnValue(static, _, _) =>
+    case f@ForeignValue(static, _, _) =>
       if(static) appl(Prim(f.field.get(null)), stk)
       else appl(Func(1, args => args match {
         case List(x) => whnf(x) match {

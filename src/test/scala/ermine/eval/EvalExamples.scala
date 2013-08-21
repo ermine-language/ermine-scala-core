@@ -141,13 +141,13 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   , ("append",    ListAppend)
   , ("concat",    ListConcat)
   , ("ListMonad", ListMonad)
-  , ("stringValueOfInt", ForiegnMethod(static=true, "java.lang.String", "valueOf", List("int")))
-  , ("now",         ForiegnConstructor("java.util.Date", Nil))
-  , ("emptyString", ForiegnConstructor("java.lang.String", Nil))
-  , ("stringCopy" , ForiegnConstructor("java.lang.String", List("java.lang.String")))
-  , ("toLowerCase", ForiegnMethod(static=false, "java.lang.String", "toLowerCase", Nil))
-  , ("replaceChar", ForiegnMethod(static=false, "java.lang.String", "replace", List("char", "char")))
-  , ("pi",          ForiegnValue(static=true, "java.lang.Math", "PI"))
+  , ("stringValueOfInt", ForeignMethod(static=true, "java.lang.String", "valueOf", List("int")))
+  , ("now",         ForeignConstructor("java.util.Date", Nil))
+  , ("emptyString", ForeignConstructor("java.lang.String", Nil))
+  , ("stringCopy" , ForeignConstructor("java.lang.String", List("java.lang.String")))
+  , ("toLowerCase", ForeignMethod(static=false, "java.lang.String", "toLowerCase", Nil))
+  , ("replaceChar", ForeignMethod(static=false, "java.lang.String", "replace", List("char", "char")))
+  , ("pi",          ForeignValue(static=true, "java.lang.Math", "PI"))
   ), c
   )).get
 
@@ -176,13 +176,13 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   evalTest("if", v"if" * v"True" * v"one" * v"one", Prim(1))
   evalTest("pair", showBool(eqb(v"True", v"snd" * (v"Pair" * v"one" * v"False"))), Prim("False"))
   evalTest("constructor with no args",    v"emptyString", Prim(""))
-  evalTest("constructor with args",       v"stringCopy" * LitString("cartman"), Prim("cartman"))
+  evalTest("constructor with args",       v"stringCopy"  * LitString("cartman"), Prim("cartman"))
   evalTest("instance function,  no args", v"toLowerCase" * LitString("CartMan"), Prim("cartman"))
   evalTest("instance function with args", v"replaceChar" * LitString("F*CK") * LitChar('*') * LitChar('!'), Prim("F!CK"))
   evalTest("static value", v"pi", Prim(math.Pi))
   evalTest(
     "instance value",
-    ForiegnValue(static=false, "ermine.eval.Dummy", "x") * ForiegnConstructor("ermine.eval.Dummy", Nil),
+    ForeignValue(static=false, "ermine.eval.Dummy", "x") * ForeignConstructor("ermine.eval.Dummy", Nil),
     Prim(5)
   )
 }

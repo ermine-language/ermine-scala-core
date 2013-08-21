@@ -52,19 +52,19 @@ sealed trait HardCore extends Core[Nothing]
 
   case class PrimOp(name: String) extends HardCore
 
-  case class ForiegnMethod(static: Boolean, className: String, methodName: String, argumentTypes: List[String]) extends HardCore {
+  case class ForeignMethod(static: Boolean, className: String, methodName: String, argumentTypes: List[String]) extends HardCore {
     // TODO: maybe catch an error here if class is not found
     lazy val method = Class.forName(className).getMethod(methodName, argumentTypes.map(getClassFor):_*)
     lazy val arity = method.getParameterTypes.length.toByte
   }
 
-  case class ForiegnConstructor(className: String, argumentTypes: List[String]) extends HardCore {
+  case class ForeignConstructor(className: String, argumentTypes: List[String]) extends HardCore {
     // TODO: maybe catch an error here if class is not found
     lazy val con: java.lang.reflect.Constructor[_] = Class.forName(className).getConstructor(argumentTypes.map(getClassFor):_*)
     lazy val arity = con.getParameterTypes.length.toByte
   }
 
-  case class ForiegnValue(static: Boolean, className: String, fieldName: String) extends HardCore {
+  case class ForeignValue(static: Boolean, className: String, fieldName: String) extends HardCore {
     // TODO: maybe catch an error here if class is not found
     lazy val field: java.lang.reflect.Field = Class.forName(className).getField(fieldName)
   }
