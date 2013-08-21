@@ -120,10 +120,6 @@ sealed trait Core[+V]{
   case class LamDict[+V](body: Scope[Unit, Core, V])                                   extends Core[V]
   case class AppDict[+V](f: Core[V], d: Core[V])                                       extends Core[V]
 
-  // hacks for prims
-  case class PartialApp[+V](fun: Core[V], args: List[Core[V]]) extends Core[V]
-  case class PrimFun(arity: Int, body: Any) extends Core[Nothing]
-
 object Core {
 
   implicit def coreEqual[V: Equal]: Equal[Core[V]] = new Equal[Core[V]] {
@@ -159,9 +155,6 @@ object Core {
       case Dict(xs, ys)   => Dict(xs.map(c => bind(c)(f)), ys.map(s => s >>>= f))
       case LamDict(e)     => LamDict(e >>>= f)
       case AppDict(x, y)  => AppDict(bind(x)(f), bind(y)(f))
-      // hacks for prims
-      case PartialApp(x, ys) => PartialApp(bind(x)(f), ys.map(c => bind(c)(f)))
-      case PrimFun(a, b)  => PrimFun(a, b)
     }
   }
 
@@ -187,9 +180,6 @@ object Core {
     case Dict(xs, ys)   => print("Dict", xs.show, ys.show)
     case LamDict(e)     => print("LamDict", e.show)
     case AppDict(x, y)  => print("AppDict", x.show, y.show)
-    // hacks for prims
-    case PartialApp(x, ys) => print("PartialApp", x.show, ys.show)
-    case PrimFun(a, b)  => print("PrimFun", a.show, b.toString)
   })
 
   val coreTraversable: Traverse[Core] = new Traverse[Core]{
@@ -210,9 +200,6 @@ object Core {
         case Dict(xs, ys)   => A.apply2(xs.traverse(traverse(_)(f)), ys.traverse(traverseScope))(Dict(_, _))
         case LamDict(e)     => traverseScope(e).map(LamDict(_))
         case AppDict(x, y)  => A.apply2(traverse(x)(f), traverse(y)(f))(AppDict(_, _))
-        // hacks for prims
-        case PartialApp(x, ys) => A.apply2(traverse(x)(f), ys.traverse(traverse(_)(f)))(PartialApp(_, _))
-        case PrimFun(a, b)  => A.point(PrimFun(a, b))
       }
     }
   }
