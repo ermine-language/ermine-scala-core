@@ -122,19 +122,23 @@ object Eval {
 
   private def pickBranch(env: Env, c: Core[Address],
                          branches: Map[Byte, (Byte, Scope[Byte, Core, Address])],
-                         default: Option[Scope[Unit, Core, Address]]): (Core[Address], Env) = whnf(eval(env, c)) match {
-    case d@Data(tag, fields) =>
-      val addr = new Address
-      branches.get(tag) match {
-        case Some((_, body)) =>
-          val addrs = fields.map(_ => new Address)
-          (body.instantiate(b => Var((addr :: addrs)(b.toInt))), ((addr,d) :: addrs.zip(fields)).toMap)
-        case None => default match {
-          case Some(body) => (body.instantiate(_ => Var(addr)), Map(addr -> d))
-          case None       => panic("non-exhaustive case statement without default")
+                         default: Option[Scope[Unit, Core, Address]]): (Core[Address], Env) = {
+    lazy val evaledAddr = new Address
+    def defaultCase(e: Runtime): (Core[Address], Env) = (default.get.instantiate(_ => Var(evaledAddr)), Map(evaledAddr -> e))
+
+    whnf(eval(env, c)) match {
+      case d@Data(tag, fields) =>
+        val addr = new Address
+        branches.get(tag) match {
+          case Some((_, body)) =>
+            val addrs = fields.map(_ => new Address)
+            (body.instantiate(b => Var((evaledAddr :: addrs)(b.toInt))), ((evaledAddr,d) :: addrs.zip(fields)).toMap)
+          case None if default.isDefined => defaultCase(d)
+          case _ => panic("non-exhaustive case statement without default")
         }
-      }
-    case x => panic(s"pick branch is confused: $x : ${x.getClass}")
+      case x if branches.size == 0 && default.isDefined => defaultCase(x)
+      case x => panic(s"pick branch is confused: $x : ${x.getClass}")
+    }
   }
 
   @annotation.tailrec
