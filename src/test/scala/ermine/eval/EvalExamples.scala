@@ -14,33 +14,33 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   val True:  Core[String] = CoreData(1, Nil)
 
   // Pair
-  val Pair = "l" !: "r" !: CoreData(0, List(v"l", v"r"))
+  val Pair = ("l", "r") !: CoreData(0, List(v"l", v"r"))
   val Fst =  "p" !: cases(v"p", (0, (List("a", "b"), v"a")))
   val Snd =  "p" !: cases(v"p", (0, (List("a", "b"), v"b")))
 
   // List
   val NiL: Core[String]  = CoreData(0, Nil)
-  val Cons  = "head" !: "tail" !: CoreData(1, List(v"head", v"tail"))
+  val Cons  = ("head", "tail") !: CoreData(1, List(v"head", v"tail"))
   val Head  = "l" !: cases(v"l", (0, (List(), Err("Can't get the head of Nil"))), (1, (List("a", "rest"), v"a")))
   val Tail  = "l" !: cases(v"l", (0, (List(), Err("Can't get the head of Nil"))), (1, (List("a", "rest"), v"rest")))
   val Empty = "l" !: cases(v"l", 0 -> (Nil -> True), 1 -> (Nil -> False))
   def mkList(input:Core[String]*) = input.foldRight(NiL){ (c, acc) => v"Cons" * c * acc }
 
-  val Take  = "n" !: "xs" !:
+  val Take  = ("n", "xs") !:
     v"if" * eqInt(v"n", 0) * NiL * cases(v"xs",
       0 -> (Nil -> NiL),
       1 -> (List("h", "t") -> v"Cons" * v"h" * (v"take" * (v"-" * v"n" * 1) * v"t"))
     )
 
-  val Replicate  = "n" !: "a" !:
+  val Replicate  = ("n", "a") !:
     v"if" * eqInt(v"n", 0) * NiL * (v"Cons" * v"a" * (v"replicate" * (v"-" * v"n" * 1) * v"a"))
 
-  val ListMap = "f" !: "l" !: cases(v"l",
+  val ListMap = ("f", "l") !: cases(v"l",
     0 -> (Nil -> NiL),
     1 -> (List("h", "t") -> v"Cons" * (v"f" * v"h") * (v"map" * v"f" * v"t"))
   )
 
-  val ListAppend = "xs" !: "ys" !: cases(v"xs",
+  val ListAppend = ("xs", "ys") !: cases(v"xs",
     0 -> (Nil -> v"ys"),
     1 -> (List("h", "t") -> v"Cons" * v"h" * (v"append" * v"t" * v"ys"))
   )
@@ -50,12 +50,12 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
     1 -> (List("h", "t") -> v"append" * v"h" * (v"concat" * v"t"))
   )
 
-  val Intersperse = "sep" !: "l" !: cases(v"l",
+  val Intersperse = ("sep", "l") !: cases(v"l",
     0 -> (Nil -> NiL),
     1 -> (List("x", "xs") -> v"Cons" * v"x" * (v"prependToAll" * v"sep" * v"xs")
   ))
 
-  val PrependToAll = "sep" !: "l" !: cases(v"l",
+  val PrependToAll = ("sep", "l") !: cases(v"l",
     0 -> (Nil -> NiL),
     1 -> (List("x", "xs") -> v"Cons" * v"sep" * (v"Cons" * v"x" * (v"prependToAll" * v"sep" * v"xs"))
   ))
@@ -82,7 +82,7 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
     1 -> (List("x", "xs") -> v"stringAppend" * v"x" * (v"joinStringList" * v"xs"))
   )
 
-  val EqInt = dict("==" -> ("a" !: "b" !: (PrimOp("eqInt") * v"a" * v"b")))
+  val EqInt = dict("==" -> (("a", "b") !: (PrimOp("eqInt") * v"a" * v"b")))
   def eqInt(a:Core[String], b: Core[String]) = AppDict(Slot(0), v"EqInt") * a * b
 
   def ShowList(sup: Dict[String]): Dict[String] = dict(
@@ -96,16 +96,16 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   def showBoolList(c: Core[String]) = AppDict(Slot(0), v"ShowBoolList") * c
   def showIntList(c: Core[String])  = AppDict(Slot(0), v"ShowIntList")  * c
 
-  val If = "t" !: "x" !: "y" !: cases(eqb(v"t", True), 0 -> (Nil -> v"y"), 1 -> (Nil -> v"x"))
+  val If = ("t", "x", "y") !: cases(eqb(v"t", True), 0 -> (Nil -> v"y"), 1 -> (Nil -> v"x"))
 
   val ListFunctor = dict("fmap" -> ListMap)
   val ListAp      = dict(
     "pure" -> ("a" !: mkList(v"a")),
-    "<*>"  -> ("f" !: "a" !: (v"concat" * (v"map" * ("x" !: (v"map" * ("y" !: v"x" * v"y")) * v"f") * v"a")))
+    "<*>"  -> (("f", "a") !: (v"concat" * (v"map" * ("x" !: (v"map" * ("y" !: v"x" * v"y")) * v"f") * v"a")))
   )
   val ListMonad   = dict(
     "unit" -> ("a" !: mkList(v"a")),
-    ">>="  -> ("xs" !: "f" !: (v"concat" * (v"map" * v"f" * v"xs")))
+    ">>="  -> (("xs", "f") !: (v"concat" * (v"map" * v"f" * v"xs")))
   )
 
   def cooked(c:Core[String]) = closed(let_(List(

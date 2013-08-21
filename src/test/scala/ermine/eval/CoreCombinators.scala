@@ -49,6 +49,10 @@ trait CoreCombinators {
 
   implicit class PimpedCore(e: Core[String]) {
     def !:(s:String) = lam[String, Core](s)(e)
+    def !:(ss:(String,String)) = ss match {case (s1, s2) => lam[String, Core](s1,s2)(e)}
+    def !:(ss:(String,String,String)) = ss match {case (s1,s2,s3) => lam[String, Core](s1,s2,s3)(e)}
+    def !:(ss:(String,String,String,String)) = ss match {case (s1,s2,s3,s4) => lam[String, Core](s1,s2,s3,s4)(e)}
+    def !:(ss:(String,String,String,String,String)) = ss match {case (s1,s2,s3,s4,s5) => lam[String, Core](s1,s2,s3,s4,s5)(e)}
   }
 
   implicit def intToLitInt(i:Int) = LitInt(i)
