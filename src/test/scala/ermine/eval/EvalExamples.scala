@@ -148,6 +148,7 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   , ("toLowerCase", ForeignMethod(static=false, "java.lang.String", "toLowerCase", Nil))
   , ("replaceChar", ForeignMethod(static=false, "java.lang.String", "replace", List("char", "char")))
   , ("pi",          ForeignValue(static=true, "java.lang.Math", "PI"))
+  , ("seq", ("a","b") !: gcases(v"a", "_", Some(v"b")))
   ), c
   )).get
 

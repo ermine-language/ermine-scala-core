@@ -25,11 +25,29 @@ trait CoreCombinators {
   })
 
   // combinator for building case statements
-  def cases(c: Core[String], branches: (Int, (List[String], Core[String]))*): Case[String] = Case(
-    c, branches.toMap.mapKeys(_.toByte).mapValues{
-      case (vars, cr) => ((0:Byte), abstrakt(cr)(indexWhere(_, vars).map((x:Byte) => (x + 1).toByte)))
-    }, None
-  )
+  def cases(c: Core[String], branches: (Int, (List[String], Core[String]))*): Case[String] =
+    gcases(c, "_", None, branches:_*)
+
+  /** Fully general case statement builder. Case statements have the general form:
+   *
+   *   case e of x {
+   *     _DEFAULT_ -> ...
+   *     0 [vs] -> ...
+   *     ...
+   *
+   * where x is bound to the whnf of e, and scopes over all branches, including the
+   * default, and the _DEFAULT_ case is present iff the rest of the cases are not
+   * exhaustive.
+   */
+  def gcases(c: Core[String],
+             as: String,
+             default: Option[Core[String]],
+             branches: (Int, (List[String], Core[String]))*): Case[String] = {
+    val bs : Map[Byte, (Byte, Scope[Byte, Core, String])] = branches.map({
+        case (tag, (vs, body)) => (tag.toByte, (vs.length.toByte, abstrakt(body)(indexWhere(_, as::vs))))
+      }).toMap
+    Case(c, bs, default.map(abstract1(as, _)))
+  }
 
   //  A smart constructor for Lamb
   def lam[A,F[+_]](vs: A*)(body: Core[A])(implicit m: Monad[F], e: Equal[A]): Lam[A] =
