@@ -152,9 +152,15 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   ), c
   )).get
 
-  def evalTest(name: String, c:Core[String], expectedResult:Prim) = test(name)(
-    Eval.whnf(Eval.eval(Map(), cooked(c))) == expectedResult
-  )
+  def evl(c:Core[String]) = Eval.whnf(Eval.eval(Map(), cooked(c)))
+  def evalTest(name: String, c:Core[String], expectedResult:Prim) = test(name)(evl(c) == expectedResult)
+  def evalTestBottom(name: String, c:Core[String], expectedErrorMessage: String) = test(name){
+    val res = evl(c)
+    res match {
+      case b:Bottom => b.render === s"<exception: $expectedErrorMessage>"
+      case x => false
+    }
+  }
 
   evalTest(
     "show bool list",
@@ -186,4 +192,6 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
     ForeignValue(static=false, "ermine.eval.Dummy", "x") * ForeignConstructor("ermine.eval.Dummy", Nil),
     Prim(5)
   )
+  evalTestBottom("err", Err("death!"), "death!")
+  evalTestBottom("seq with err", v"seq" * Err("seq death!") * 5, "seq death!")
 }

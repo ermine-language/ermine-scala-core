@@ -127,8 +127,8 @@ object Eval {
     def defaultCase(e: Runtime): (Core[Address], Env) = (default.get.instantiate(_ => Var(evaledAddr)), Map(evaledAddr -> e))
 
     whnf(eval(env, c)) match {
+      case b: Bottom => (Var(evaledAddr), Map(evaledAddr -> b))
       case d@Data(tag, fields) =>
-        val addr = new Address
         branches.get(tag) match {
           case Some((_, body)) =>
             val addrs = fields.map(_ => new Address)
