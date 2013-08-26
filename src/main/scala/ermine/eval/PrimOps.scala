@@ -25,19 +25,19 @@ object PrimOps {
 
   def primOp[T](f: Function1[T, Any]): Runtime =
     Func(1, { case List(arg1) => Eval.whnf(arg1) match {
-      case Prim(x : T) => adjustBooleans(f(x))
+      case Prim(x : T @unchecked) => adjustBooleans(f(x))
       case _ => panic("prim-op called with wrong number of arguments")
     }})
 
   def primOp[T, U](f: Function2[T, U, Any]): Runtime =
     Func(2, { case List(arg1, arg2) => (Eval.whnf(arg1), Eval.whnf(arg2)) match {
-      case (Prim(x : T), Prim(y : U)) => adjustBooleans(f(x,y))
+      case (Prim(x : T @unchecked), Prim(y : U @unchecked)) => adjustBooleans(f(x,y))
       case _ => panic("prim-op called with wrong number of arguments")
     }})
 
   def primOp[T,U,V](f: Function3[T, U, V, Any]): Runtime =
     Func(3, { case List(arg1, arg2, arg3) => (Eval.whnf(arg1), Eval.whnf(arg2), Eval.whnf(arg3)) match {
-      case (Prim(x : T), Prim(y : U), Prim(z : V)) => adjustBooleans(f(x,y,z))
+      case (Prim(x : T @unchecked), Prim(y : U @unchecked), Prim(z : V @unchecked)) => adjustBooleans(f(x,y,z))
       case _ => panic("prim-op called with wrong number of arguments")
     }})
 }
