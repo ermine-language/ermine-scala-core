@@ -21,16 +21,20 @@ object CoreSerializationTests extends ErmineProperties("CoreSerializationTests")
 
 object RoundTripTest extends ErmineProperties("RoundTripTest") {
 
-  lazy val coreEchoExists = new java.io.File("../ermine/dist/build/core-echo/core-echo.exe").exists
+  import java.io._
+
+  lazy val coreEcho =
+    Option(new File("../ermine/dist/build/core-echo/core-echo.exe")).filter(_.exists).orElse(
+    Option(new File("../ermine/dist/build/core-echo/core-echo"    )).filter(_.exists)
+  )
 
   test("roundtrip")(forAll{(a: Core[Int]) => echo(a) })
   test("floats")(forAll{(f: Float) => echo(LitFloat(f))})
   test("doubles")(forAll{(d: Double) => echo(LitDouble(d))})
 
-  def echo(c:Core[Int]) = coreEchoExists ==> (c === callHaskellEcho(coreW(intW), coreR(intR))(c))
+  def echo(c:Core[Int]) = coreEcho.isDefined ==> (c === callHaskellEcho(coreW(intW), coreR(intR))(c))
 
   def callHaskellEcho[A, F](w: f0.Writer[A,F], r: f0.Reader[A,F])(aOut: A)(implicit eql: Equal[A], arb: Arbitrary[A]): A = {
-    import java.io._
     List(new File("core.in.toString"), new File("core.in"), new File("core.out")).foreach(_.delete)
     // write the core to a file so that if it fails we have it around to paste back into code
     val pw  = new PrintWriter("core.in.toString")
@@ -39,7 +43,7 @@ object RoundTripTest extends ErmineProperties("RoundTripTest") {
     // serialize the Core[Int] out to a file.
     Sinks.toFile("core.in").using{ s => w.bind(s)(aOut) }
     // call the haskell process that reads it in from core.in and spits it back out into core.out
-    val p = Runtime.getRuntime.exec("../ermine/dist/build/core-echo/core-echo.exe")
+    val p = Runtime.getRuntime.exec(coreEcho.get.getAbsolutePath)
     // read all the output from the process or else it can get deadlocked due to laziness
     scala.io.Source.fromInputStream(p.getInputStream).mkString
     p.waitFor
