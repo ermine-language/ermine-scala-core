@@ -4,6 +4,8 @@ import bound._
 import bound.Scope._
 import scalaz._
 import Scalaz._
+import f0.{Read, Sources}
+import java.security.MessageDigest
 
 object Native {
   def getClassFor(name: String): Class[_] = name match {
@@ -21,6 +23,52 @@ object Native {
 }
 
 import Native._
+
+sealed trait Assoc
+  case object L extends Assoc
+  case object R extends Assoc
+  case object N extends Assoc
+
+trait Fixity
+  case class Infix(assoc:Assoc, level:Int) extends Fixity
+  case class Prefix(level:Int) extends Fixity
+  case class Postfix(level:Int) extends Fixity
+  case object IdFix extends Fixity
+
+object Digest{
+  def apply(bytes: Array[Byte]): Digest = {
+    val s = Sources.fromArray(bytes)
+    new Digest(Read.longF(s), Read.longF(s))
+  }
+
+  def apply(strings: String*) : Digest = {
+    val md = MessageDigest.getInstance("MD5")
+    strings.foreach(s => md.update(s.getBytes))
+    Digest(md.digest)
+  }
+
+}
+case class Digest(part1: Long, part2: Long)
+
+object ModuleName {
+  def apply(pkg: String, name: String): ModuleName = {
+    new ModuleName(Digest(pkg, name), pkg, name)
+  }
+}
+case class ModuleName(digest: Digest, pkg: String, name: String)
+
+object Global {
+  def apply(fixity: Fixity, module: ModuleName, name: String): Global = {
+    new Global(Digest(module.pkg, module.name, name), fixity, module, name)
+  }
+}
+case class Global(digest: Digest, fixity: Fixity, module: ModuleName, name: String)
+
+case class Module(
+  name:        ModuleName,
+  definitions: List[Core[Int]],
+  termExports: Map[Global, Either[Global, Int]],
+  instances:   Map[Digest, Either[ModuleName, Int]])
 
 /**
 data Core a
@@ -50,7 +98,9 @@ sealed trait HardCore extends Core[Nothing]
   case class LitFloat (extract: Float)   extends Lit
   case class LitDouble(extract: Double)  extends Lit
 
-  case class PrimOp(name: String) extends HardCore
+  case class PrimOp(name: String)   extends HardCore
+  case class GlobalRef(g: Global)   extends HardCore
+  case class InstanceRef(d: Digest) extends HardCore
 
   case class ForeignMethod(static: Boolean, className: String, methodName: String, argumentTypes: List[String]) extends HardCore {
     // TODO: maybe catch an error here if class is not found
