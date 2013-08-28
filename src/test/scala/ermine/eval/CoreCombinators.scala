@@ -13,6 +13,14 @@ trait CoreCombinators {
     def v(args: Any*): Core[String] = Var(sc.parts.mkString)
   }
 
+  implicit class MkGlobal(val sc: StringContext) {
+    def g(args: Any*): Core[String] = {
+      val s = sc.parts.mkString
+      val i = s.lastIndexOf(".")
+      GlobalRef(Global(IdFix, ModuleName("ermine", s.substring(0, i)), s.substring(i+1)))
+    }
+  }
+
   def indexWhere[A](a: A, as: Seq[A])(implicit e: Equal[A]): Option[Byte] = {
     val index = as.indexWhere(_ === a).toByte
     if(index == -1) None else Some(index)

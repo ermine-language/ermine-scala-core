@@ -64,9 +64,9 @@ object Global {
 }
 case class Global(digest: Digest, fixity: Fixity, module: ModuleName, name: String)
 
-case class Module(
+case class Module[+A](
   name:        ModuleName,
-  definitions: List[Core[Int]],
+  definitions: List[Core[A]],
   termExports: Map[Global, Either[Global, Int]],
   instances:   Map[Digest, Either[ModuleName, Int]])
 

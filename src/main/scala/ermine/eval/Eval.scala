@@ -8,6 +8,9 @@ object Eval {
 
   def die(msg: String) = throw Death(msg)
 
+  // HACK!
+  var modules: Map[ModuleName, Module[Address]] = Map()
+
   @annotation.tailrec
   final def eval(env: Env, core: Core[Address], stk: List[Runtime] = Nil): Runtime = core match {
     case Var(a)            => appl(env.getOrElse(a, panic(s"bad variable reference $a")), stk)
@@ -23,6 +26,15 @@ object Eval {
       case (x :: _) => panic(s"Slot applied to non-dictionary $x")
       case Nil => Func(1, { case List(Evidence(_, slots)) => slots(b.toInt) })
     }
+
+    // TODO: Ed says this can be eliminated by resolving everything before
+    // calling eval.
+    case GlobalRef(g@Global(_, _, mn, n)) =>
+      val m = modules(mn)
+      m.termExports(g) match {
+        case Left(g)  => eval(env, GlobalRef(g), stk)
+        case Right(i) => eval(env, m.definitions(i), stk)
+      }
 
     case Err(msg)          => Bottom(die(msg))
 

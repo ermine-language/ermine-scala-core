@@ -9,9 +9,19 @@ import Core._
 
 object EvalExamples extends ErmineProperties("CoreSerializationTests") with CoreCombinators {
 
-  // Booleans
-  val False: Core[String] = CoreData(0, Nil)
-  val True:  Core[String] = CoreData(1, Nil)
+  val boolModuleName = ModuleName("ermine", "Bool")
+  val boolModule = Module(boolModuleName,
+    definitions = List(
+      CoreData(0, Nil) // False
+     ,CoreData(1, Nil) // True
+    ),
+    termExports = Map(
+      Global(IdFix, boolModuleName, "False") -> Right(0),
+      Global(IdFix, boolModuleName, "True")  -> Right(1)
+    ),
+    instances = Map(
+    )
+  )
 
   // Pair
   val Pair = ("l", "r") !: CoreData(0, List(v"l", v"r"))
@@ -23,7 +33,7 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   val Cons  = ("head", "tail") !: CoreData(1, List(v"head", v"tail"))
   val Head  = "l" !: cases(v"l", (0, (List(), Err("Can't get the head of Nil"))), (1, (List("a", "rest"), v"a")))
   val Tail  = "l" !: cases(v"l", (0, (List(), Err("Can't get the head of Nil"))), (1, (List("a", "rest"), v"rest")))
-  val Empty = "l" !: cases(v"l", 0 -> (Nil -> True), 1 -> (Nil -> False))
+  val Empty = "l" !: cases(v"l", 0 -> (Nil -> g"Bool.False"), 1 -> (Nil -> g"Bool.False"))
   def mkList(input:Core[String]*) = input.foldRight(NiL){ (c, acc) => v"Cons" * c * acc }
 
   val Take  = ("n", "xs") !:
@@ -67,8 +77,8 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   // Dictionaries
   val EqBool = dict(
     "==" -> ("a" !: "b" !: cases(v"a",
-      0 -> (Nil -> cases(v"b", 0 -> (Nil -> True),  1 -> (Nil -> False))),
-      1 -> (Nil -> cases(v"b", 0 -> (Nil -> False), 1 -> (Nil -> True)))
+      0 -> (Nil -> cases(v"b", 0 -> (Nil -> g"Bool.True"),  1 -> (Nil -> g"Bool.False"))),
+      1 -> (Nil -> cases(v"b", 0 -> (Nil -> g"Bool.False"), 1 -> (Nil -> g"Bool.True")))
     ))
   )
   def eqb(a:Core[String], b: Core[String]) = AppDict(Slot(0), v"EqBool") * a * b
@@ -96,7 +106,7 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   def showBoolList(c: Core[String]) = AppDict(Slot(0), v"ShowBoolList") * c
   def showIntList(c: Core[String])  = AppDict(Slot(0), v"ShowIntList")  * c
 
-  val If = ("t", "x", "y") !: cases(eqb(v"t", True), 0 -> (Nil -> v"y"), 1 -> (Nil -> v"x"))
+  val If = ("t", "x", "y") !: cases(eqb(v"t", g"Bool.True"), 0 -> (Nil -> v"y"), 1 -> (Nil -> v"x"))
 
   val ListFunctor = dict("fmap" -> ListMap)
   val ListAp      = dict(
@@ -109,9 +119,7 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   )
 
   def cooked(c:Core[String]) = closed(let_(List(
-    ("False",    False)
-  , ("True",     True)
-  , ("one",      LitInt(1))
+    ("one",      LitInt(1))
   , ("Pair",     Pair)
   , ("fst",      Fst)
   , ("snd",      Snd)
@@ -152,7 +160,11 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   ), c
   )).get
 
-  def evl(c:Core[String]) = Eval.whnf(Eval.eval(Map(), cooked(c)))
+  def evl(c:Core[String]) = {
+    // HACK!
+    Eval.modules = Map(boolModuleName -> boolModule)
+    Eval.whnf(Eval.eval(Map(), cooked(c)))
+  }
   def evalTest(name: String, c:Core[String], expectedResult:Prim) = test(name)(evl(c) == expectedResult)
   def evalTestBottom(name: String, c:Core[String], expectedErrorMessage: String) = test(name){
     val res = evl(c)
@@ -162,9 +174,10 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
     }
   }
 
+  evalTest("True", showBool(g"Bool.True"), Prim("True"))
   evalTest(
     "show bool list",
-    showBoolList(mkList(v"True", v"True", v"False", v"False")),
+    showBoolList(mkList(g"Bool.True", g"Bool.True", g"Bool.False", g"Bool.False")),
     Prim("[True,True,False,False]")
   )
   evalTest("stringValueOfInt", v"stringValueOfInt" * v"one", Prim("1"))
@@ -180,8 +193,8 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
     showIntList(v"intersperse" * 7 * (v"map" * (v"+" * 2) * (v"take" * 10 * v"ones"))),
     Prim("[3,7,3,7,3,7,3,7,3,7,3,7,3,7,3,7,3,7,3]")
   )
-  evalTest("if", v"if" * v"True" * v"one" * v"one", Prim(1))
-  evalTest("pair", showBool(eqb(v"True", v"snd" * (v"Pair" * v"one" * v"False"))), Prim("False"))
+  evalTest("if", v"if" * g"Bool.True" * v"one" * v"one", Prim(1))
+  evalTest("pair", showBool(eqb(g"Bool.True", v"snd" * (v"Pair" * v"one" * g"Bool.False"))), Prim("False"))
   evalTest("constructor with no args",    v"emptyString", Prim(""))
   evalTest("constructor with args",       v"stringCopy"  * LitString("cartman"), Prim("cartman"))
   evalTest("instance function,  no args", v"toLowerCase" * LitString("CartMan"), Prim("cartman"))
