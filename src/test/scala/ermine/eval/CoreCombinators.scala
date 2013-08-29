@@ -73,6 +73,9 @@ trait CoreCombinators {
   def lam[A,F[+_]](vs: A*)(body: Core[A])(implicit m: Monad[F], e: Equal[A]): Lam[A] =
     Lam(vs.size.toByte, abstrakt(body)(b => indexWhere(b, vs.toList)))
 
+  def lamDict[A,F[+_]](v: A)(body: Core[A])(implicit m: Monad[F], e: Equal[A]): LamDict[A] =
+    LamDict(abstract1(v,body))
+
   def let_[A](es: List[(A, Core[A])], e:Core[A]): Core[A] = es match {
     case Nil => e
     case _ =>
