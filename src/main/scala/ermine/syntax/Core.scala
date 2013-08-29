@@ -36,19 +36,19 @@ trait Fixity
   case object IdFix extends Fixity
 
 object Digest{
-  def apply(bytes: Array[Byte]): Digest = {
+  def apply(bytes: Array[Byte], original: Option[String] = None): Digest = {
     val s = Sources.fromArray(bytes)
-    new Digest(Read.longF(s), Read.longF(s))
+    new Digest(Read.longF(s), Read.longF(s), original.getOrElse(new String(bytes)))
   }
 
   def apply(strings: String*) : Digest = {
     val md = MessageDigest.getInstance("MD5")
     strings.foreach(s => md.update(s.getBytes))
-    Digest(md.digest)
+    Digest(md.digest, Some(strings.mkString(".")))
   }
 
 }
-case class Digest(part1: Long, part2: Long)
+case class Digest(part1: Long, part2: Long, original: String)
 
 object ModuleName {
   def apply(pkg: String, name: String): ModuleName = {
@@ -68,12 +68,12 @@ case class Module[+A](
   name:        ModuleName,
   definitions: Vector[Core[A]],
   termExports: Map[Global, Either[Global, A]],
-  instances:   Map[Digest, Either[ModuleName, A]]) {
+  instances:   Map[Digest, A]) {
   def map[B](f: A => B): Module[B] =
     copy(
       definitions = definitions.map(_.map(f)),
       termExports = termExports.mapValues(_.right.map(f)),
-      instances   = instances.mapValues(_.right.map(f))
+      instances   = instances.mapValues(f)
     )
 }
 

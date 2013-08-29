@@ -21,6 +21,10 @@ trait CoreCombinators {
     }
   }
 
+  implicit class MkInstanceRef(val sc: StringContext) {
+    def i(args: Any*): InstanceRef = InstanceRef(Digest(sc.parts.mkString))
+  }
+
   implicit class MkModule(val sc: StringContext) {
     def m(args: Any*): ModuleName = ModuleName("ermine", sc.parts.mkString)
   }
@@ -77,6 +81,23 @@ trait CoreCombinators {
         if(i>=0) Some(i.toByte) else None
       })(e)
       Let(es.map(t => abstr(t._2)), abstr(e))
+  }
+
+  def module(name: String, defs: (String, Core[String])*)(instances: (String, Core[String])*): Module[Int] = {
+    val mn = name.m
+    val names = defs.map(_._1) ++ instances.map(_._1)
+    Module(mn,
+      definitions = (defs.map(_._2).toVector ++ instances.map(_._2).toVector).map(_.map(name => {
+        val index = names.indexOf(name)
+        if(index >= 0) index else throw new RuntimeException(s"name not found: $name")
+      })),
+      termExports = defs.zipWithIndex.map {
+        case ((name, c), i) => (Global(mn, name), Right(i))
+      }.toMap,
+      instances = instances.zipWithIndex.map {
+        case ((iname, c), i) => (Digest(iname), i + defs.length)
+      }.toMap
+    )
   }
 
   def abstractR[B,F[+_],A](f : A => Option[B])(w : F[A])(implicit M: scalaz.Monad[F]) = abstrakt(w)(f)

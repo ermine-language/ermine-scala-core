@@ -4,20 +4,29 @@ import bound.Scope
 import ermine.syntax.{Data => CoreData, _}
 import Runtime.Env
 
+object SessionEnv {
+  def load(modules: Module[Int]*): SessionEnv = new SessionEnv().processModules(modules.toList)
+}
+
+case class SessionEnv(env: Env = Map(), globs: Map[Global, Address] = Map(), digests: Map[Digest, Address] = Map()){
+  def processModule(mod: Module[Int]): SessionEnv = {
+    val addrs = mod.definitions.map(_ => new Address)
+    val amod  = mod.map(i => addrs(i))
+    var newEnv : Env = null
+    newEnv = this.env ++ amod.definitions.zip(addrs).map({ case (c, a) => a -> Thunk(newEnv, c, true) }).toMap
+    SessionEnv(newEnv, this.globs ++ amod.termExports.map {
+      case (g1, Left(g2))    => g1 -> this.globs(g2)
+      case (g1, Right(addr)) => g1 -> addr
+    }, this.digests ++ amod.instances)
+  }
+  def processModules(modules: List[Module[Int]]): SessionEnv = modules.foldLeft(this){ case (s, m) => s.processModule(m) }
+}
+
 object Eval {
 
   def die(msg: String) = throw Death(msg)
 
-  // HACK!
-  var modules: Map[ModuleName, Module[Address]] = Map()
-
-  final def processModule(mod: Module[Int]): (Env, Module[Address]) = {
-    val addrs = mod.definitions.map(_ => new Address)
-    val amod = mod.map(i => addrs(i))
-    var env : Env = null
-    env = amod.definitions.zip(addrs).map({ case (c, a) => a -> Thunk(env, c, true) }).toMap
-    (env, amod)
-  }
+  var sessionEnv: SessionEnv = null
 
   @annotation.tailrec
   final def eval(env: Env, core: Core[Address], stk: List[Runtime] = Nil): Runtime = core match {
@@ -35,14 +44,9 @@ object Eval {
       case Nil => Func(1, { case List(Evidence(_, slots)) => slots(b.toInt) })
     }
 
-    // TODO: Ed says this can be eliminated by resolving everything before
-    // calling eval.
-     case GlobalRef(g@Global(_, _, mn, n)) =>
-       val m = modules(mn)
-       m.termExports(g) match {
-         case Left(g)  => eval(env, GlobalRef(g), stk)
-         case Right(addr) => appl(env(addr), stk)
-       }
+    case GlobalRef(g) => appl(env(sessionEnv.globs(g)), stk)
+
+    case InstanceRef(d) => appl(env(sessionEnv.digests(d)), stk)
 
     case Err(msg)          => Bottom(die(msg))
 
