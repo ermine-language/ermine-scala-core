@@ -66,9 +66,16 @@ case class Global(digest: Digest, fixity: Fixity, module: ModuleName, name: Stri
 
 case class Module[+A](
   name:        ModuleName,
-  definitions: List[Core[A]],
-  termExports: Map[Global, Either[Global, Int]],
-  instances:   Map[Digest, Either[ModuleName, Int]])
+  definitions: Vector[Core[A]],
+  termExports: Map[Global, Either[Global, A]],
+  instances:   Map[Digest, Either[ModuleName, A]]) {
+  def map[B](f: A => B): Module[B] =
+    copy(
+      definitions = definitions.map(_.map(f)),
+      termExports = termExports.mapValues(_.right.map(f)),
+      instances   = instances.mapValues(_.right.map(f))
+    )
+}
 
 /**
 data Core a

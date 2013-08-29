@@ -25,6 +25,10 @@ trait CoreCombinators {
     def m(args: Any*): ModuleName = ModuleName("ermine", sc.parts.mkString)
   }
 
+  implicit class ToModule(s:String) {
+    def m = ModuleName("ermine", s)
+  }
+
   def indexWhere[A](a: A, as: Seq[A])(implicit e: Equal[A]): Option[Byte] = {
     val index = as.indexWhere(_ === a).toByte
     if(index == -1) None else Some(index)

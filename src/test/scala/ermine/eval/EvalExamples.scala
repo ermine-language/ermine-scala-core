@@ -9,18 +9,27 @@ import Core._
 
 object EvalExamples extends ErmineProperties("CoreSerializationTests") with CoreCombinators {
 
-  val boolModule = Module(m"Bool",
-    definitions = List(
-      CoreData(0, Nil) // False
-     ,CoreData(1, Nil) // True
-    ),
-    termExports = Map(
-      g"Bool.False" -> Right(0),
-      g"Bool.True"  -> Right(1)
-    ),
-    instances = Map(
-    )
+  val boolModule = module("Bool",
+    "False" -> CoreData(0, Nil),
+    "True"  -> CoreData(1, Nil),
+    "if"    -> (("t", "x", "y") !: cases(v"t", 0 -> (Nil -> v"y"), 1 -> (Nil -> v"x")))
+  )(
+
   )
+
+  def module(name: String, defs: (String, Core[String])*)(instances: (String, Core[String])*): Module[Int] = {
+    val mn = name.m
+    val names = defs.map(_._1) ++ instances.map(_._1)
+    Module(mn,
+      definitions = (defs.map(_._2).toVector ++ instances.map(_._2).toVector).map(c => c.map(names.indexOf(_))),
+      termExports = defs.zipWithIndex.map {
+        case ((name, c), i) => (Global(mn, name), Right(i))
+      }.toMap,
+      instances = instances.zipWithIndex.map {
+        case ((name, c), i) => (Digest(name), Right(i + defs.length))
+      }.toMap
+    )
+  }
 
   // Pair
   val Pair = ("l", "r") !: CoreData(0, List(v"l", v"r"))
@@ -105,7 +114,7 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   def showBoolList(c: Core[String]) = AppDict(Slot(0), v"ShowBoolList") * c
   def showIntList(c: Core[String])  = AppDict(Slot(0), v"ShowIntList")  * c
 
-  val If = ("t", "x", "y") !: cases(eqb(v"t", g"Bool.True"), 0 -> (Nil -> v"y"), 1 -> (Nil -> v"x"))
+  val If = ("t", "x", "y") !: cases(v"t", 0 -> (Nil -> v"y"), 1 -> (Nil -> v"x"))
 
   val ListFunctor = dict("fmap" -> ListMap)
   val ListAp      = dict(
@@ -161,8 +170,9 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
 
   def evl(c:Core[String]) = {
     // HACK!
-    Eval.modules = Map(m"Bool" -> boolModule)
-    Eval.whnf(Eval.eval(Map(), cooked(c)))
+    val (e, b) = Eval.processModule(boolModule)
+    Eval.modules = Map(m"Bool" -> b)
+    Eval.whnf(Eval.eval(e, cooked(c)))
   }
   def evalTest(name: String, c:Core[String], expectedResult:Prim) = test(name)(evl(c) == expectedResult)
   def evalTestBottom(name: String, c:Core[String], expectedErrorMessage: String) = test(name){

@@ -11,6 +11,14 @@ object Eval {
   // HACK!
   var modules: Map[ModuleName, Module[Address]] = Map()
 
+  final def processModule(mod: Module[Int]): (Env, Module[Address]) = {
+    val addrs = mod.definitions.map(_ => new Address)
+    val amod = mod.map(i => addrs(i))
+    var env : Env = null
+    env = amod.definitions.zip(addrs).map({ case (c, a) => a -> Thunk(env, c, true) }).toMap
+    (env, amod)
+  }
+
   @annotation.tailrec
   final def eval(env: Env, core: Core[Address], stk: List[Runtime] = Nil): Runtime = core match {
     case Var(a)            => appl(env.getOrElse(a, panic(s"bad variable reference $a")), stk)
@@ -29,12 +37,12 @@ object Eval {
 
     // TODO: Ed says this can be eliminated by resolving everything before
     // calling eval.
-    case GlobalRef(g@Global(_, _, mn, n)) =>
-      val m = modules(mn)
-      m.termExports(g) match {
-        case Left(g)  => eval(env, GlobalRef(g), stk)
-        case Right(i) => eval(env, m.definitions(i), stk)
-      }
+     case GlobalRef(g@Global(_, _, mn, n)) =>
+       val m = modules(mn)
+       m.termExports(g) match {
+         case Left(g)  => eval(env, GlobalRef(g), stk)
+         case Right(addr) => env(addr)
+       }
 
     case Err(msg)          => Bottom(die(msg))
 
