@@ -14,11 +14,15 @@ trait CoreCombinators {
   }
 
   implicit class MkGlobal(val sc: StringContext) {
-    def g(args: Any*): Core[String] = {
+    def g(args: Any*): Global = {
       val s = sc.parts.mkString
       val i = s.lastIndexOf(".")
-      GlobalRef(Global(IdFix, ModuleName("ermine", s.substring(0, i)), s.substring(i+1)))
+      Global(ModuleName("ermine", s.substring(0, i)), s.substring(i+1))
     }
+  }
+
+  implicit class MkModule(val sc: StringContext) {
+    def m(args: Any*): ModuleName = ModuleName("ermine", sc.parts.mkString)
   }
 
   def indexWhere[A](a: A, as: Seq[A])(implicit e: Equal[A]): Option[Byte] = {
@@ -82,6 +86,7 @@ trait CoreCombinators {
   }
 
   implicit def intToLitInt(i:Int) = LitInt(i)
+  implicit def globalToRef(g:Global) = GlobalRef(g)
 
   def closed[A, B](fa:Core[A]): Option[Core[B]] = {
     implicit val x = Core.coreTraversable

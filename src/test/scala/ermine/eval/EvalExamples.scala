@@ -9,15 +9,14 @@ import Core._
 
 object EvalExamples extends ErmineProperties("CoreSerializationTests") with CoreCombinators {
 
-  val boolModuleName = ModuleName("ermine", "Bool")
-  val boolModule = Module(boolModuleName,
+  val boolModule = Module(m"Bool",
     definitions = List(
       CoreData(0, Nil) // False
      ,CoreData(1, Nil) // True
     ),
     termExports = Map(
-      Global(IdFix, boolModuleName, "False") -> Right(0),
-      Global(IdFix, boolModuleName, "True")  -> Right(1)
+      g"Bool.False" -> Right(0),
+      g"Bool.True"  -> Right(1)
     ),
     instances = Map(
     )
@@ -162,7 +161,7 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
 
   def evl(c:Core[String]) = {
     // HACK!
-    Eval.modules = Map(boolModuleName -> boolModule)
+    Eval.modules = Map(m"Bool" -> boolModule)
     Eval.whnf(Eval.eval(Map(), cooked(c)))
   }
   def evalTest(name: String, c:Core[String], expectedResult:Prim) = test(name)(evl(c) == expectedResult)

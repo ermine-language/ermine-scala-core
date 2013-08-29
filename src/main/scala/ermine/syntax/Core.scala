@@ -58,7 +58,7 @@ object ModuleName {
 case class ModuleName(digest: Digest, pkg: String, name: String)
 
 object Global {
-  def apply(fixity: Fixity, module: ModuleName, name: String): Global = {
+  def apply(module: ModuleName, name: String, fixity: Fixity = IdFix): Global = {
     new Global(Digest(module.pkg, module.name, name), fixity, module, name)
   }
 }
