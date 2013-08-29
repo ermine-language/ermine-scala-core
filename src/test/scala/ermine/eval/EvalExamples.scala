@@ -4,28 +4,9 @@ package eval
 import scalaz._
 import Scalaz._
 import ermine.syntax._
-import ermine.syntax.{ Data => CoreData }
-import Core._
+import TestLib._
 
 object EvalExamples extends ErmineProperties("CoreSerializationTests") with CoreCombinators {
-
-  import TestLib._
-
-  def evl(c:Core[String]) = {
-    Eval.sessionEnv = SessionEnv.load(prelude, stringModule, boolModule, intModule, tupleModule, mathModule, listModule)
-    Eval.whnf(Eval.eval(Eval.sessionEnv.env, closed(c).get))
-  }
-  def evalTest(name: String, c:Core[String], expectedResult:Prim) = test(name){
-    //println(evl(c))
-    evl(c) == expectedResult
-  }
-  def evalTestBottom(name: String, c:Core[String], expectedErrorMessage: String) = test(name){
-    val res = evl(c)
-    res match {
-      case b:Bottom => b.render === s"<exception: $expectedErrorMessage>"
-      case x => false
-    }
-  }
 
   evalTest("showBool True", showBool(g"Bool.True"), Prim("True"))
   evalTest("pair", showBool(eqb(g"Bool.True", g"Tuple.snd" * (g"Tuple.Pair" * 1 * g"Bool.False"))), Prim("False"))
@@ -61,4 +42,20 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   )
   evalTestBottom("err", Err("death!"), "death!")
   evalTestBottom("seq with err", g"Prelude.seq" * Err("seq death!") * 5, "seq death!")
+
+  def evl(c:Core[String]) = {
+    Eval.sessionEnv = SessionEnv.load(prelude, stringModule, boolModule, intModule, tupleModule, mathModule, listModule)
+    Eval.whnf(Eval.eval(Eval.sessionEnv.env, closed(c).get))
+  }
+  def evalTest(name: String, c:Core[String], expectedResult:Prim) = test(name){
+    //println(evl(c))
+    evl(c) == expectedResult
+  }
+  def evalTestBottom(name: String, c:Core[String], expectedErrorMessage: String) = test(name){
+    val res = evl(c)
+    res match {
+      case b:Bottom => b.render === s"<exception: $expectedErrorMessage>"
+      case x => false
+    }
+  }
 }
