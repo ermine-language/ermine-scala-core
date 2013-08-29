@@ -45,13 +45,13 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   def mkList(input:Core[String]*) = input.foldRight(NiL){ (c, acc) => v"Cons" * c * acc }
 
   val Take  = ("n", "xs") !:
-    v"if" * eqInt(v"n", 0) * NiL * cases(v"xs",
+    g"Bool.if" * eqInt(v"n", 0) * NiL * cases(v"xs",
       0 -> (Nil -> NiL),
       1 -> (List("h", "t") -> v"Cons" * v"h" * (v"take" * (v"-" * v"n" * 1) * v"t"))
     )
 
   val Replicate  = ("n", "a") !:
-    v"if" * eqInt(v"n", 0) * NiL * (v"Cons" * v"a" * (v"replicate" * (v"-" * v"n" * 1) * v"a"))
+    g"Bool.if" * eqInt(v"n", 0) * NiL * (v"Cons" * v"a" * (v"replicate" * (v"-" * v"n" * 1) * v"a"))
 
   val ListMap = ("f", "l") !: cases(v"l",
     0 -> (Nil -> NiL),
@@ -114,8 +114,6 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   def showBoolList(c: Core[String]) = AppDict(Slot(0), v"ShowBoolList") * c
   def showIntList(c: Core[String])  = AppDict(Slot(0), v"ShowIntList")  * c
 
-  val If = ("t", "x", "y") !: cases(v"t", 0 -> (Nil -> v"y"), 1 -> (Nil -> v"x"))
-
   val ListFunctor = dict("fmap" -> ListMap)
   val ListAp      = dict(
     "pure" -> ("a" !: mkList(v"a")),
@@ -152,7 +150,6 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
   , ("replicate",    Replicate)
   , ("ones",      Ones)
   , ("nats",      Nats)
-  , ("if",        If)
   , ("take",      Take)
   , ("append",    ListAppend)
   , ("concat",    ListConcat)
@@ -174,7 +171,10 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
     Eval.modules = Map(m"Bool" -> b)
     Eval.whnf(Eval.eval(e, cooked(c)))
   }
-  def evalTest(name: String, c:Core[String], expectedResult:Prim) = test(name)(evl(c) == expectedResult)
+  def evalTest(name: String, c:Core[String], expectedResult:Prim) = test(name){
+    //println(evl(c))
+    evl(c) == expectedResult
+  }
   def evalTestBottom(name: String, c:Core[String], expectedErrorMessage: String) = test(name){
     val res = evl(c)
     res match {
@@ -202,7 +202,7 @@ object EvalExamples extends ErmineProperties("CoreSerializationTests") with Core
     showIntList(v"intersperse" * 7 * (v"map" * (v"+" * 2) * (v"take" * 10 * v"ones"))),
     Prim("[3,7,3,7,3,7,3,7,3,7,3,7,3,7,3,7,3,7,3]")
   )
-  evalTest("if", v"if" * g"Bool.True" * v"one" * v"one", Prim(1))
+  evalTest("if", g"Bool.if" * g"Bool.True" * v"one" * v"one", Prim(1))
   evalTest("pair", showBool(eqb(g"Bool.True", v"snd" * (v"Pair" * v"one" * g"Bool.False"))), Prim("False"))
   evalTest("constructor with no args",    v"emptyString", Prim(""))
   evalTest("constructor with args",       v"stringCopy"  * LitString("cartman"), Prim("cartman"))

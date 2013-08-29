@@ -41,7 +41,7 @@ object Eval {
        val m = modules(mn)
        m.termExports(g) match {
          case Left(g)  => eval(env, GlobalRef(g), stk)
-         case Right(addr) => env(addr)
+         case Right(addr) => appl(env(addr), stk)
        }
 
     case Err(msg)          => Bottom(die(msg))
