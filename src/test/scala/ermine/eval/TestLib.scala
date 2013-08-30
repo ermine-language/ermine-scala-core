@@ -8,11 +8,11 @@ import ermine.syntax.{ Data => CoreData }
 import Core._
 
 object TestLib extends CoreCombinators {
-  val prelude = module("Prelude",
+  val prelude = module("Prelude")(
     "seq" -> (("a","b") !: gcases(v"a", "_", Some(v"b")))
   )()
 
-  val boolModule = module("Bool",
+  val boolModule = module("Bool")(
     "False" -> CoreData(0, Nil),
     "True"  -> CoreData(1, Nil),
     "if"    -> (("t", "x", "y") !: cases(v"t", 0 -> (Nil -> v"y"), 1 -> (Nil -> v"x")))
@@ -28,8 +28,8 @@ object TestLib extends CoreCombinators {
     )
   )
 
-  val stringModule = module("String",
-    ("stringAppend", PrimOp("stringAppend"))
+  val stringModule = module("String")(
+    ("append", PrimOp("stringAppend"))
   , ("stringValueOfInt", ForeignMethod(static=true, "java.lang.String", "valueOf", List("int")))
   , ("emptyString", ForeignConstructor("java.lang.String", Nil))
   , ("stringCopy" , ForeignConstructor("java.lang.String", List("java.lang.String")))
@@ -37,7 +37,7 @@ object TestLib extends CoreCombinators {
   , ("replaceChar", ForeignMethod(static=false, "java.lang.String", "replace", List("char", "char")))
   )()
 
-  val intModule = module("Int",
+  val intModule = module("Int")(
     "-" -> PrimOp("minusInt"),
     "+" -> PrimOp("plusInt")
   )(
@@ -45,17 +45,17 @@ object TestLib extends CoreCombinators {
     "showInt" -> dict("show" -> ("i" !: g"String.stringValueOfInt" * v"i"))
   )
 
-  val tupleModule = module("Tuple",
+  val tupleModule = module("Tuple")(
     "Pair" -> (("l", "r") !: CoreData(0, List(v"l", v"r"))),
     "fst"  -> ("p" !: cases(v"p", (0, (List("a", "b"), v"a")))),
     "snd"  -> ("p" !: cases(v"p", (0, (List("a", "b"), v"b"))))
   )()
 
-  val mathModule = module("Math",
+  val mathModule = module("Math")(
     "pi" -> ForeignValue(static=true, "java.lang.Math", "PI")
   )()
 
-  val listModule = module("List",
+  val listModule = module("List")(
     "Nil" -> CoreData(0, Nil),
     "Cons" -> (("head", "tail") !: CoreData(1, List(v"head", v"tail"))),
     "take"  -> (("n", "xs") !:
@@ -90,7 +90,7 @@ object TestLib extends CoreCombinators {
     ))),
     "joinStringList" -> ("l" !: cases(v"l",
       0 -> (Nil -> LitString("")),
-      1 -> (List("x", "xs") -> g"String.stringAppend" * v"x" * (v"joinStringList" * v"xs"))
+      1 -> (List("x", "xs") -> g"String.append" * v"x" * (v"joinStringList" * v"xs"))
     )),
     // ones = 1 : ones
     "ones" -> v"Cons" * 1 * v"ones",
@@ -109,12 +109,6 @@ object TestLib extends CoreCombinators {
     "showIntList"  -> AppDict(ShowList,i"showInt")
   )
 
-  def ShowList: Core[String] = lamDict("d")(dict(
-    "show" -> ("l" !: cases(g"List.intersperse" * LitString(",") * (g"List.map" * AppDict(Slot(0), v"d") * v"l"),
-      0 -> (Nil -> LitString("[]")),
-      1 -> (List("h", "t") -> g"String.stringAppend" * (g"String.stringAppend" * LitString("[") * (g"List.joinStringList" * (g"List.Cons" * v"h" * v"t"))) *  LitString("]"))
-  ))))
-
   // helper functions
   def eqb(a:Core[String], b: Core[String]) = AppDict(Slot(0), i"eqBool") * a * b
   def showBool(c: Core[String]) = AppDict(Slot(0), i"showBool") * c
@@ -122,4 +116,9 @@ object TestLib extends CoreCombinators {
   def showBoolList(c: Core[String]) = AppDict(Slot(0), i"showBoolList") * c
   def showIntList(c: Core[String])  = AppDict(Slot(0), i"showIntList")  * c
   def mkList(input:Core[String]*) = input.foldRight[Core[String]](GlobalRef(g"List.Nil")){ (c, acc) => g"List.Cons" * c * acc }
+  def ShowList: Core[String] = lamDict("d")(dict(
+    "show" -> ("l" !: cases(g"List.intersperse" * LitString(",") * (g"List.map" * AppDict(Slot(0), v"d") * v"l"),
+      0 -> (Nil -> LitString("[]")),
+      1 -> (List("h", "t") -> g"String.append" * (g"String.append" * LitString("[") * (g"List.joinStringList" * (g"List.Cons" * v"h" * v"t"))) *  LitString("]"))
+  ))))
 }

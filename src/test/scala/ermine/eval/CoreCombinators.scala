@@ -86,7 +86,7 @@ trait CoreCombinators {
       Let(es.map(t => abstr(t._2)), abstr(e))
   }
 
-  def module(name: String, defs: (String, Core[String])*)(instances: (String, Core[String])*): Module[Int] = {
+  def module(name: String)(defs: (String, Core[String])*)(instances: (String, Core[String])*): Module[Int] = {
     val mn = name.m
     val names = defs.map(_._1) ++ instances.map(_._1)
     Module(mn,
