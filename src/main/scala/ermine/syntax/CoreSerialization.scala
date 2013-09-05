@@ -48,7 +48,6 @@ object CoreSerialization {
   type ConstructorF    = StringF :: StreamF[StringF]
   type ValueF          = BooleanF :: StringF :: StringF
   type ForeignF        = S3[MethodF, ConstructorF, ValueF]
-  type ForeignFHaskell = ByteF :: ForeignF
 
   lazy val foreignW: Writer[Foreign, ForeignF] = s3W(
     tuple4W(booleanW, stringW, stringW, streamW(stringW)), // ForeignMethod
@@ -66,6 +65,20 @@ object CoreSerialization {
     tuple3R(booleanR, stringR, stringR)                  .map{ case (s, cn, fn)       => ForeignValue(s, cn, fn)}
   )
 
+  /**
+   * Haskell Foreigns have slightly more structure than Foreigns in Scala.
+   * This is because the Haskell version supports other languages that Scala
+   * does not need to know about. JavaLike comes first in Haskell serialization, like so:
+   *
+   * instance Serial Foreign where
+   *   serialize (JavaLike j) = putWord8 0 >> serialize j
+   *   serialize (Unknown s)  = ...
+   *
+   * Therefore, Scala must add an extra 0:Byte when writing out Foreigns to Haskell,
+   * and when reading, must read in a byte before reading the Foreign. If that byte is anything
+   * other than 0, then Haskell must have given us some bad (non-jvm language) information.
+   */
+  type ForeignFHaskell = ByteF :: ForeignF
   lazy val foreignWHaskell: Writer[Foreign, ForeignFHaskell] = tuple2W(byteW, foreignW).cmap((f: Foreign) => (0, f))
   lazy val foreignRHaskell: Reader[Foreign, ForeignFHaskell] = tuple2R(byteR, foreignR).map{
     case (0, f) => f
@@ -238,7 +251,6 @@ object CoreSerialization {
     streamR(tuple2R(globalR, eitherR(globalR, vr))).map(_.toMap)
 
   type ModuleF[F] = ModuleNameF :: StreamF[CoreF[F]] :: TermExportsF[F] :: StreamF[P2[DigestF, F]]
-  type ModuleHaskell[F] = ModuleF[F] :: StreamF[UnitF] :: StreamF[UnitF] :: StreamF[UnitF]
 
   def moduleW[V, F](vw: Writer[V, F]): Writer[Module[V], ModuleF[F]] = tuple4W(
     moduleNameW, streamW(coreW(vw)), termExportsW(vw), streamW(tuple2W(digestW, vw))
@@ -248,6 +260,23 @@ object CoreSerialization {
     moduleNameR, streamR(coreR(vr)), termExportsR(vr), streamR(tuple2R(digestR, vr))
   ).map{ case (m, defs, terms, insts) => Module(m, defs.toVector, terms, insts.toMap) }
 
+  /**
+   * When Haskell reads in a Module, it expects some extra information that Scala doesn't know about.
+   *
+   *   _instances   :: Map ByteString Int,
+   *   _types       :: Map Global (Type Void Void),
+   *   _data        :: [DataType Void Void]
+   *
+   * When writing to Haskell, we supply empty values for these fields.
+   *
+   * When reading from Haskell (or from files written by the compiler), we can simply stop
+   * reading after reading the first four fields of the module. This strategy will fail
+   * if we have to read a list of modules, but I believe that we will be reading Modules
+   * individually from files, so this should be ok. If it isn't we may have to tweek the
+   * way Haskell serializes Modules. One possibility is the include the length of the
+   * information remaining, so that we can skip over it.
+   */
+  type ModuleHaskell[F] = ModuleF[F] :: StreamF[UnitF] :: StreamF[UnitF] :: StreamF[UnitF]
   def moduleWHaskell[V, F](vw: Writer[V, F]): Writer[Module[V], ModuleHaskell[F]] = tuple4W(
     moduleW(vw), streamW(unitW), streamW(unitW), streamW(unitW)
   ).cmap((m: Module[V]) => (m, Nil, Nil, Nil))
