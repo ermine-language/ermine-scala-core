@@ -1,6 +1,7 @@
 package ermine.syntax
 
 import f0._
+import Formats._
 import Readers._
 import Writers._
 import bound._
@@ -11,19 +12,8 @@ import bound.BoundSerialization._
  */
 object CoreSerialization {
 
-  lazy val hardcoreW: Writer[HardCore, DynamicF] = s4W(
-    byteW,  // Super
-    byteW,  // Slot
-    litW,   // Lit
-    stringW // Err
-  )((a,b,c,d) => (hc: HardCore) => hc match {
-    case Super(i) => a(i)
-    case Slot(i)  => b(i)
-    case l:Lit    => c(l)
-    case Err(msg) => d(msg)
-  }).erase
-
-  lazy val litW: Writer[Lit, DynamicF] = s8W(
+  type LitF = S8[IntF, LongF, ByteF, ShortF, StringF, IntF, FloatF, DoubleF]
+  lazy val litW: Writer[Lit, LitF] = s8W(
     intW,                            // LitInt
     longW,                           // LitInt64
     byteW,                           // LitByte
@@ -41,16 +31,9 @@ object CoreSerialization {
     case LitChar(c)   => f(c)
     case LitFloat(f)  => g(f)
     case LitDouble(d) => h(d)
-  }).erase
+  })
 
-  lazy val hardcoreR: Reader[HardCore, DynamicF] = union4R(
-    byteR   .map(Super),
-    byteR   .map(Slot),
-    litR,
-    stringR .map(Err)
-  ).erase
-
-  lazy val litR: Reader[Lit, DynamicF] = union8R(
+  lazy val litR: Reader[Lit, LitF] = union8R(
     intR    .map(LitInt),
     longR   .map(LitInt64),
     byteR   .map(LitByte),
@@ -59,7 +42,67 @@ object CoreSerialization {
     intR    .map(i => LitChar(i.toChar)),
     floatR  .map(LitFloat),
     doubleR .map(LitDouble)
-  ).erase
+  )
+
+  type MethodF         = BooleanF :: StringF :: StringF :: StreamF[StringF]
+  type ConstructorF    = StringF :: StreamF[StringF]
+  type ValueF          = BooleanF :: StringF :: StringF
+  type ForeignF        = S3[MethodF, ConstructorF, ValueF]
+  type ForeignFHaskell = ByteF :: ForeignF
+
+  lazy val foreignW: Writer[Foreign, ForeignF] = s3W(
+    tuple4W(booleanW, stringW, stringW, streamW(stringW)), // ForeignMethod
+    tuple2W(stringW, streamW(stringW)),                    // ForeignConstructor
+    tuple3W(booleanW, stringW, stringW)                    // ForeignValue
+  )((a,b,c) => (f: Foreign) => f match {
+    case ForeignMethod(s, cn, mn, args) => a((s, cn, mn, args))
+    case ForeignConstructor(cn, args)   => b((cn, args))
+    case ForeignValue(s, cn, fn)        => c((s, cn, fn))
+  })
+
+  lazy val foreignR: Reader[Foreign, ForeignF] = union3R(
+    tuple4R(booleanR, stringR, stringR, streamR(stringR)).map{ case (s, cn, mn, args) => ForeignMethod(s, cn, mn, args)},
+    tuple2R(stringR, streamR(stringR))                   .map{ case (cn, args)        => ForeignConstructor(cn, args)},
+    tuple3R(booleanR, stringR, stringR)                  .map{ case (s, cn, fn)       => ForeignValue(s, cn, fn)}
+  )
+
+  lazy val foreignWHaskell: Writer[Foreign, ForeignFHaskell] = tuple2W(byteW, foreignW).cmap((f: Foreign) => (0, f))
+  lazy val foreignRHaskell: Reader[Foreign, ForeignFHaskell] = tuple2R(byteR, foreignR).map{
+    case (0, f) => f
+    case (_, f) => sys.error("non javalike foreign detected.")
+  }
+
+  type HardcoreF = S8[ByteF, ByteF, LitF, StringF, GlobalF, DigestF, ForeignFHaskell, StringF]
+  lazy val hardcoreW: Writer[HardCore, HardcoreF] = s8W(
+    byteW,   // Super
+    byteW,   // Slot
+    litW,    // Lit
+    stringW, // PrimOp
+    globalW, // GlobalRef
+    digestW, // InstanceRef
+    foreignWHaskell, // Foreign
+    stringW  // Err
+  )((a,b,c,d,e,f,g,h) => (hc: HardCore) => hc match {
+    case Super(i)         => a(i)
+    case Slot(i)          => b(i)
+    case l:Lit            => c(l)
+    case PrimOp(n)        => d(n)
+    case GlobalRef(gl)    => e(gl)
+    case InstanceRef(dig) => f(dig)
+    case f: Foreign       => g(f)
+    case Err(msg)         => h(msg)
+  })
+
+  lazy val hardcoreR: Reader[HardCore, HardcoreF] = union8R(
+    byteR   .map(Super),
+    byteR   .map(Slot),
+    litR,
+    stringR .map(PrimOp),
+    globalR .map(GlobalRef),
+    digestR .map(InstanceRef),
+    foreignRHaskell,
+    stringR .map(Err)
+  )
 
   def branchesW[V,F](vw: Writer[V,F]): Writer[Map[Byte, (Byte, Scope[Byte, Core, V])], DynamicF] =
     streamW(tuple2W(byteW, tuple2W(byteW, scopeByteCoreVW(vw)))).cmap((m:Map[Byte, (Byte, Scope[Byte, Core, V])]) => m.toList).erase
@@ -129,4 +172,83 @@ object CoreSerialization {
       ).erase
     ).erase
   }
+
+  type AssocF = ByteF
+  lazy val assocW: Writer[Assoc, AssocF] = byteW.cmap((a: Assoc) => a match {
+    case L => 0:Byte
+    case R => 1:Byte
+    case N => 2:Byte
+  })
+
+  lazy val assocR: Reader[Assoc, AssocF] = byteR.map((b: Byte) => b match {
+    case 0 => L
+    case 1 => R
+    case 2 => N
+  })
+
+  type FixityF = S4[P2[AssocF, IntF], IntF, IntF, UnitF]
+  lazy val fixityW: Writer[Fixity, FixityF] = s4W(
+    tuple2W(assocW, intW), // Infix
+    intW,                  // Prefix
+    intW,                  // Postfix
+    unitW                  // IdFix
+  )((a,b,c,d) => (f: Fixity) => f match {
+    case Infix(assoc, l) => a((assoc, l))
+    case Prefix(i)       => b(i)
+    case Postfix(i)      => c(i)
+    case IdFix           => d(())
+  })
+
+  lazy val fixityR: Reader[Fixity, FixityF] = union4R(
+    tuple2R(assocR, intR).map{ case (a, l) => Infix(a, l) },
+    intR .map(Prefix),
+    intR .map(Postfix),
+    unitR.map(_ => IdFix)
+  )
+
+  type DigestF = LongF :: LongF
+
+  val digestW: Writer[Digest, DigestF] =
+    tuple2W(longW, longW).cmap((d: Digest) => (d.part1, d.part2))
+
+  val digestR: Reader[Digest, DigestF] =
+    tuple2R(longR, longR).map{ case (p1, p2) => Digest(p1, p2, "TODO") }
+
+  type ModuleNameF = DigestF :: StringF :: StringF
+
+  val moduleNameW: Writer[ModuleName, ModuleNameF] =
+    tuple3W(digestW, stringW, stringW).cmap((m: ModuleName) => (m.digest, m.pkg, m.name))
+
+  val moduleNameR: Reader[ModuleName, ModuleNameF] =
+    tuple3R(digestR, stringR, stringR).map{ case (d, p, n) => ModuleName(d, p, n) }
+
+  type GlobalF = DigestF :: FixityF :: ModuleNameF :: StringF
+
+  val globalW: Writer[Global, GlobalF] =
+    tuple4W(digestW, fixityW, moduleNameW, stringW).cmap((g: Global) => (g.digest, g.fixity, g.module, g.name))
+
+  val globalR: Reader[Global, GlobalF] =
+    tuple4R(digestR, fixityR, moduleNameR, stringR).map{ case (d, f, m, n) => Global(d, f, m, n) }
+
+  type TermExportsF[F] = StreamF[P2[GlobalF, S2[GlobalF, F]]]
+  def termExportsW[V, F](vw: Writer[V, F]): Writer[Map[Global, Either[Global, V]], TermExportsF[F]] =
+    streamW(tuple2W(globalW, eitherW(globalW, vw)))
+
+  def termExportsR[V, F](vr: Reader[V, F]): Reader[Map[Global, Either[Global, V]], TermExportsF[F]] =
+    streamR(tuple2R(globalR, eitherR(globalR, vr))).map(_.toMap)
+
+  type ModuleF[F] = ModuleNameF :: StreamF[CoreF[F]] :: TermExportsF[F] :: StreamF[P2[DigestF, F]]
+  type ModuleHaskell[F] = ModuleF[F] :: StreamF[UnitF] :: StreamF[UnitF] :: StreamF[UnitF]
+
+  def moduleW[V, F](vw: Writer[V, F]): Writer[Module[V], ModuleF[F]] = tuple4W(
+    moduleNameW, streamW(coreW(vw)), termExportsW(vw), streamW(tuple2W(digestW, vw))
+  ).cmap((m: Module[V]) => (m.name, m.definitions, m.termExports, m.instances.toStream))
+
+  def moduleR[V, F](vr: Reader[V, F]): Reader[Module[V], ModuleF[F]] = tuple4R(
+    moduleNameR, streamR(coreR(vr)), termExportsR(vr), streamR(tuple2R(digestR, vr))
+  ).map{ case (m, defs, terms, insts) => Module(m, defs.toVector, terms, insts.toMap) }
+
+  def moduleWHaskell[V, F](vw: Writer[V, F]): Writer[Module[V], ModuleHaskell[F]] = tuple4W(
+    moduleW(vw), streamW(unitW), streamW(unitW), streamW(unitW)
+  ).cmap((m: Module[V]) => (m, Nil, Nil, Nil))
 }

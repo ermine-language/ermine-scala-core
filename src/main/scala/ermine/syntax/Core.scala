@@ -109,19 +109,20 @@ sealed trait HardCore extends Core[Nothing]
   case class GlobalRef(g: Global)   extends HardCore
   case class InstanceRef(d: Digest) extends HardCore
 
-  case class ForeignMethod(static: Boolean, className: String, methodName: String, argumentTypes: List[String]) extends HardCore {
+  sealed trait Foreign extends HardCore
+  case class ForeignMethod(static: Boolean, className: String, methodName: String, argumentTypes: List[String]) extends Foreign {
     // TODO: maybe catch an error here if class is not found
     lazy val method = Class.forName(className).getMethod(methodName, argumentTypes.map(getClassFor):_*)
     lazy val arity = method.getParameterTypes.length.toByte
   }
 
-  case class ForeignConstructor(className: String, argumentTypes: List[String]) extends HardCore {
+  case class ForeignConstructor(className: String, argumentTypes: List[String]) extends Foreign {
     // TODO: maybe catch an error here if class is not found
     lazy val con: java.lang.reflect.Constructor[_] = Class.forName(className).getConstructor(argumentTypes.map(getClassFor):_*)
     lazy val arity = con.getParameterTypes.length.toByte
   }
 
-  case class ForeignValue(static: Boolean, className: String, fieldName: String) extends HardCore {
+  case class ForeignValue(static: Boolean, className: String, fieldName: String) extends Foreign {
     // TODO: maybe catch an error here if class is not found
     lazy val field: java.lang.reflect.Field = Class.forName(className).getField(fieldName)
   }
