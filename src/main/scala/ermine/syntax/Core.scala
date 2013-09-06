@@ -29,11 +29,19 @@ sealed trait Assoc
   case object R extends Assoc
   case object N extends Assoc
 
+object Accoc {
+  implicit val assocEqual: Equal[Assoc] = Equal.equalA[Assoc]
+}
+
 trait Fixity
   case class Infix(assoc:Assoc, level:Int) extends Fixity
   case class Prefix(level:Int) extends Fixity
   case class Postfix(level:Int) extends Fixity
   case object IdFix extends Fixity
+
+object Fixity {
+  implicit val fixityEqual: Equal[Fixity] = Equal.equalA[Fixity]
+}
 
 object Digest{
   def apply(bytes: Array[Byte], original: Option[String] = None): Digest = {
@@ -46,7 +54,7 @@ object Digest{
     strings.foreach(s => md.update(s.getBytes))
     Digest(md.digest, Some(strings.mkString(".")))
   }
-
+  implicit val digestEqual: Equal[Digest] = Equal.equalA[Digest]
 }
 case class Digest(part1: Long, part2: Long, original: String)
 
@@ -54,6 +62,7 @@ object ModuleName {
   def apply(pkg: String, name: String): ModuleName = {
     new ModuleName(Digest(pkg, name), pkg, name)
   }
+  implicit val moduleEqual: Equal[ModuleName] = Equal.equalA[ModuleName]
 }
 case class ModuleName(digest: Digest, pkg: String, name: String)
 
@@ -61,6 +70,7 @@ object Global {
   def apply(module: ModuleName, name: String, fixity: Fixity = IdFix): Global = {
     new Global(Digest(module.pkg, module.name, name), fixity, module, name)
   }
+  implicit val globalEqual: Equal[Global] = Equal.equalA[Global]
 }
 case class Global(digest: Digest, fixity: Fixity, module: ModuleName, name: String)
 
@@ -75,6 +85,13 @@ case class Module[+A](
       termExports = termExports.mapValues(_.right.map(f)),
       instances   = instances.mapValues(f)
     )
+}
+
+object Module {
+  implicit def ModuleEqual[V: Equal]: Equal[Module[V]] = Equal.equalA[Module[V]]
+  implicit val moduleEqual1: Equal1[Module] = new Equal1[Module] {
+    def equal[V: Equal](m1: Module[V], m2: Module[V]) = m1 === m2
+  }
 }
 
 /**

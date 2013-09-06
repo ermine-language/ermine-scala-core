@@ -19,7 +19,7 @@ case class SessionEnv(env: Env = Map(), globs: Map[Global, Address] = Map(), dig
       case (g1, Right(addr)) => g1 -> addr
     }, this.digests ++ amod.instances)
   }
-  def processModules(modules: List[Module[Int]]): SessionEnv = modules.foldLeft(this){ case (s, m) => s.processModule(m) }
+  def processModules(modules: List[Module[Int]]): SessionEnv = modules.foldLeft(this)(_.processModule(_))
 }
 
 object Eval {

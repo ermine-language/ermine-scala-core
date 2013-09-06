@@ -85,4 +85,32 @@ object CoreArbitraryInstances {
       case AppDict(f, d)        => Stream(f, d)
     }
   }
+
+  implicit val ArbitraryAssoc: Arbitrary[Assoc] = Arbitrary(oneOf(L, R, N))
+
+  implicit val ArbitraryFixity: Arbitrary[Fixity] = Arbitrary(oneOf(
+    for { a <- arbitrary[Assoc]; l <- arbitrary[Int] } yield Infix(a, l),
+    arbitrary[Int]  .map(Prefix),
+    arbitrary[Int]  .map(Postfix),
+    IdFix
+  ))
+
+  implicit val ArbitraryDigest: Arbitrary[Digest] = Arbitrary(arbitrary[String].map(Digest(_)))
+
+  implicit val ArbitraryModuleName: Arbitrary[ModuleName] = Arbitrary(
+    for { pkg <- arbitrary[String]; n <- arbitrary[String] } yield ModuleName(pkg, n)
+  )
+
+  implicit val ArbitraryGlobal: Arbitrary[Global] = Arbitrary(
+    for { mn <- arbitrary[ModuleName]; n  <- arbitrary[String]; f <- arbitrary[Fixity] } yield Global(mn, n, f)
+  )
+
+  implicit def ArbitraryModule[V](implicit av: Arbitrary[V]): Arbitrary[Module[V]] = Arbitrary(Gen.sized { size =>
+    def resize[T](g:Gen[T]) = Gen.resize(size / 2, g)
+    for { mn    <- arbitrary[ModuleName]
+          defs  <- resize(arbitrary[List[Core[V]]])
+          terms <- arbitrary[Map[Global, Either[Global, V]]]
+          insts <- arbitrary[Map[Digest, V]]
+    } yield Module(mn, defs.toVector, terms, insts)
+  })
 }
