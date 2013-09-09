@@ -64,7 +64,7 @@ object Fixity {
       case (Idfix, _)                     => Ordering.GT
       case (_, Idfix)                     => Ordering.LT
       case (Prefix(_), _)                 => Ordering.LT
-      case (Postfix(_), _)                => Ordering.LT
+      case (Postfix(_), _)                => Ordering.GT
     }
   }
 }

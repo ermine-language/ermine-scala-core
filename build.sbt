@@ -4,6 +4,7 @@ scalaVersion := "2.10.2"
 
 libraryDependencies ++= Seq(
   "org.scalaz"     %% "scalaz-core"               % "7.0.3",
+  "org.scalaz"     %% "scalaz-scalacheck-binding" % "7.0.3" % "test",
   "org.scalacheck" %% "scalacheck"                % "1.10.1" % "test",
   "machines"       %% "machines"                  % "1.0",
   "com.clarifi"    %% "f0"                        % "1.1",
