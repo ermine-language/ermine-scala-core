@@ -28,7 +28,7 @@ object CoreArbitraryInstances {
   }
 
   implicit def ArbitraryCore[V](implicit av: Arbitrary[V]): Arbitrary[Core[V]] = Arbitrary(Gen.sized { size =>
-    def resize[T](g:Gen[T]) = Gen.resize(size / 2, g)
+    def resize[T](g:Gen[T]) = Gen.resize(size / 4, g)
     size match {
       case 0 => oneOf(for { v <- av.arbitrary } yield Var(v), ArbitraryHardCore.arbitrary)
       case n => oneOf(
