@@ -259,7 +259,7 @@ object Core {
     def equal[V: Equal](c1: Core[V], c2: Core[V]) = c1 === c2
   }
 
-  implicit val coreMonad: Monad[Core] = new Monad[Core]{
+  implicit val coreMonad: Traverse[Core] with Monad[Core] = new Traverse[Core] with Monad[Core]{
     def point[A](a: => A) = Var(a)
     def bind[A,B](c: Core[A])(f: A => Core[B]): Core[B] = c match {
       case Var(a)         => f(a)
@@ -272,6 +272,27 @@ object Core {
       case Dict(xs, ys)   => Dict(xs.map(c => bind(c)(f)), ys.map(s => s >>>= f))
       case LamDict(e)     => LamDict(e >>>= f)
       case AppDict(x, y)  => AppDict(bind(x)(f), bind(y)(f))
+    }
+
+    // TODO: this + is unsound; see https://github.com/scalaz/scalaz/pull/328
+    def traverseImpl[F[+_], A, B](exp : Core[A])(f : A => F[B])(implicit A: Applicative[F]) : F[Core[B]] = {
+      def traverseScope[V](s: Scope[V, Core, A]) = s.traverse(f)
+      exp match {
+        case Var(a)         => f(a).map(Var(_))
+        case h: HardCore    => A.point(h)
+        case Data(n, xs)    => xs.traverse(traverse(_)(f)).map(Data(n, _))
+        case App(x, y)      => A.apply2(traverse(x)(f), traverse(y)(f))(App(_, _))
+        case Lam(a, e)      => e.traverse(f).map(Lam(a, _))
+        case Let(bs, b)     => A.apply2(bs.traverse(traverseScope), b.traverse(f))(Let(_, _))
+        case Case(e, bs, d) => A.apply3(
+          traverse(e)(f),
+          bs.toList.traverse{ case (i, (b, s)) => traverseScope(s).map(a => (i, (b, a))) }.map(_.toMap),
+          d.traverse(traverseScope)
+        )(Case(_, _, _))
+        case Dict(xs, ys)   => A.apply2(xs.traverse(traverse(_)(f)), ys.traverse(traverseScope))(Dict(_, _))
+        case LamDict(e)     => traverseScope(e).map(LamDict(_))
+        case AppDict(x, y)  => A.apply2(traverse(x)(f), traverse(y)(f))(AppDict(_, _))
+      }
     }
   }
 
@@ -298,26 +319,4 @@ object Core {
     case LamDict(e)     => print("LamDict", e.show)
     case AppDict(x, y)  => print("AppDict", x.show, y.show)
   })
-
-  val coreTraversable: Traverse[Core] = new Traverse[Core]{
-    def traverseImpl[F[+_], A, B](exp : Core[A])(f : A => F[B])(implicit A: Applicative[F]) : F[Core[B]] = {
-      def traverseScope[V](s: Scope[V, Core, A]) = s.traverse(f)(A, coreTraversable)
-      exp match {
-        case Var(a)         => f(a).map(Var(_))
-        case h: HardCore    => A.point(h)
-        case Data(n, xs)    => xs.traverse(traverse(_)(f)).map(Data(n, _))
-        case App(x, y)      => A.apply2(traverse(x)(f), traverse(y)(f))(App(_, _))
-        case Lam(a, e)      => e.traverse(f)(A, coreTraversable).map(Lam(a, _))
-        case Let(bs, b)     => A.apply2(bs.traverse(traverseScope), b.traverse(f)(A, coreTraversable))(Let(_, _))
-        case Case(e, bs, d) => A.apply3(
-          traverse(e)(f),
-          bs.toList.traverse{ case (i, (b, s)) => traverseScope(s).map(a => (i, (b, a))) }.map(_.toMap),
-          d.traverse(traverseScope)
-        )(Case(_, _, _))
-        case Dict(xs, ys)   => A.apply2(xs.traverse(traverse(_)(f)), ys.traverse(traverseScope))(Dict(_, _))
-        case LamDict(e)     => traverseScope(e).map(LamDict(_))
-        case AppDict(x, y)  => A.apply2(traverse(x)(f), traverse(y)(f))(AppDict(_, _))
-      }
-    }
-  }
 }
