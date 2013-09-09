@@ -85,25 +85,25 @@ object CoreSerialization {
     case (_, f) => sys.error("non javalike foreign detected.")
   }
 
-  type HardcoreF = S8[ByteF, ByteF, LitF, StringF, GlobalF, DigestF, ForeignFHaskell, StringF]
+  type HardcoreF = S8[ByteF, ByteF, LitF, StringF, ForeignFHaskell, StringF ,GlobalF, DigestF]
   lazy val hardcoreW: Writer[HardCore, HardcoreF] = s8W(
     byteW,   // Super
     byteW,   // Slot
     litW,    // Lit
     stringW, // PrimOp
-    globalW, // GlobalRef
-    digestW, // InstanceRef
     foreignWHaskell, // Foreign
-    stringW  // Err
+    stringW, // Err
+    globalW, // GlobalRef
+    digestW  // InstanceRef
   )((a,b,c,d,e,f,g,h) => (hc: HardCore) => hc match {
     case Super(i)         => a(i)
     case Slot(i)          => b(i)
     case l:Lit            => c(l)
     case PrimOp(n)        => d(n)
-    case GlobalRef(gl)    => e(gl)
-    case InstanceRef(dig) => f(dig)
-    case f: Foreign       => g(f)
-    case Err(msg)         => h(msg)
+    case f: Foreign       => e(f)
+    case Err(msg)         => f(msg)
+    case GlobalRef(gl)    => g(gl)
+    case InstanceRef(dig) => h(dig)
   })
 
   lazy val hardcoreR: Reader[HardCore, HardcoreF] = union8R(
@@ -111,10 +111,10 @@ object CoreSerialization {
     byteR   .map(Slot),
     litR,
     stringR .map(PrimOp),
-    globalR .map(GlobalRef),
-    digestR .map(InstanceRef),
     foreignRHaskell,
-    stringR .map(Err)
+    stringR .map(Err),
+    globalR .map(GlobalRef),
+    digestR .map(InstanceRef)
   )
 
   def branchesW[V,F](vw: Writer[V,F]): Writer[Map[Byte, (Byte, Scope[Byte, Core, V])], DynamicF] =

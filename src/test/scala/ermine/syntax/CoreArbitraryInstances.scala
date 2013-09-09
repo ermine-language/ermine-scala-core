@@ -109,9 +109,8 @@ object CoreArbitraryInstances {
   )
 
   implicit def ArbitraryModule[V](implicit av: Arbitrary[V]): Arbitrary[Module[V]] = Arbitrary(Gen.sized { size =>
-    def resize[T](g:Gen[T]) = Gen.resize(size / 4, g)
     for { mn    <- arbitrary[ModuleName]
-          defs  <- resize(arbitrary[List[Core[V]]])
+          defs  <- arbitrary[List[Core[V]]]
           terms <- arbitrary[Map[Global, Either[Global, V]]]
           insts <- arbitrary[Map[Digest, V]]
     } yield Module(mn, defs.toVector, terms, insts)
