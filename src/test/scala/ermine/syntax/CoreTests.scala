@@ -18,7 +18,7 @@ object CoreTests extends ErmineProperties("Core Tests"){
   test("Global order")(order.laws[Global])
   test("Module order")(equal.laws[Module[Int]])
   test("Core Int equal")(equal.laws[Core[Int]])
-  test("Core String equal")(equal.laws[Core[Int]])
+  test("Core String equal")(equal.laws[Core[String]])
   test("HardCore equal")(equal.laws[HardCore])
   test("Core monad")(monad.laws[Core])
   //test("Core traverse")(traverse.laws[Core])
