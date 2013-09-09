@@ -6,7 +6,7 @@ import Scalaz._
 import ermine.syntax._
 import TestLib._
 
-object EvalExamples extends ErmineProperties("CoreSerializationTests") with CoreCombinators {
+object EvalExamples extends ErmineProperties("EvalExamples") with CoreCombinators {
 
   evalTest("showBool True", showBool(g"Bool.True"), Prim("True"))
   evalTest("pair", showBool(eqb(g"Bool.True", g"Tuple.snd" * (g"Tuple.Pair" * 1 * g"Bool.False"))), Prim("False"))

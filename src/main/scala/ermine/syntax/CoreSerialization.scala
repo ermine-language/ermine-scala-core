@@ -204,19 +204,19 @@ object CoreSerialization {
     tuple2W(assocW, intW), // Infix
     intW,                  // Prefix
     intW,                  // Postfix
-    unitW                  // IdFix
+    unitW                  // Idfix
   )((a,b,c,d) => (f: Fixity) => f match {
     case Infix(assoc, l) => a((assoc, l))
     case Prefix(i)       => b(i)
     case Postfix(i)      => c(i)
-    case IdFix           => d(())
+    case Idfix           => d(())
   })
 
   lazy val fixityR: Reader[Fixity, FixityF] = union4R(
     tuple2R(assocR, intR).map{ case (a, l) => Infix(a, l) },
     intR .map(Prefix),
     intR .map(Postfix),
-    unitR.map(_ => IdFix)
+    unitR.map(_ => Idfix)
   )
 
   type DigestF = LongF :: LongF
@@ -225,7 +225,7 @@ object CoreSerialization {
     tuple2W(longW, longW).cmap((d: Digest) => (d.part1, d.part2))
 
   val digestR: Reader[Digest, DigestF] =
-    tuple2R(longR, longR).map{ case (p1, p2) => Digest(p1, p2, "TODO") }
+    tuple2R(longR, longR).map{ case (p1, p2) => new Digest(p1, p2) }
 
   type ModuleNameF = DigestF :: StringF :: StringF
 
@@ -277,7 +277,4 @@ object CoreSerialization {
    * information remaining, so that we can skip over it.
    */
   type ModuleHaskell[F] = ModuleF[F] :: StreamF[UnitF] :: StreamF[UnitF] :: StreamF[UnitF]
-  def moduleWHaskell[V, F](vw: Writer[V, F]): Writer[Module[V], ModuleHaskell[F]] = tuple4W(
-    moduleW(vw), streamW(unitW), streamW(unitW), streamW(unitW)
-  ).cmap((m: Module[V]) => (m, Nil, Nil, Nil))
 }

@@ -1,7 +1,7 @@
 package ermine
 package syntax
 
-import org.scalacheck.{Prop, Arbitrary}
+import org.scalacheck.{Shrink, Prop, Arbitrary}
 import org.scalacheck.Prop._
 import f0._
 import f0.Readers._
@@ -14,8 +14,18 @@ import CoreSerialization._
 object CoreSerializationTests extends ErmineProperties("CoreSerializationTests") {
 
   test("core == put/get core")(clone(coreW(intW), coreR(intR)))
+  test("digest == put/get digest")(clone(digestW, digestR))
+  test("global == put/get global")(clone(globalW, globalR))
+  test("moduleName == put/get moduleName")(clone(moduleNameW, moduleNameR))
+  test("termExports == put/get termExports")(clone(termExportsW(intW), termExportsR(intR)))
+  test("instances == put/get instances")(clone(streamW(tuple2W(digestW, intW)), streamR(tuple2R(digestR, intR))))
+  test("module == put/get module")(clone(moduleW(intW), moduleR(intR)))
 
-  def clone[A,F](w: f0.Writer[A,F], r: f0.Reader[A,F])(implicit eql: Equal[A], arb: Arbitrary[A]): Prop =
+  def moduleWHaskell[V, F](vw: f0.Writer[V, F]): f0.Writer[Module[V], ModuleHaskell[F]] = tuple4W(
+    moduleW(vw), streamW(unitW), streamW(unitW), streamW(unitW)
+  ).cmap((m: Module[V]) => (m, Nil, Nil, Nil))
+
+  def clone[A,F](w: f0.Writer[A,F], r: f0.Reader[A,F])(implicit eql: Equal[A], arb: Arbitrary[A], s: Shrink[A]): Prop =
     forAll((a: A) => { r(w.toByteArray(a)) === a })
 }
 
