@@ -186,46 +186,58 @@ object CoreSerialization {
     ).erase
   }
 
-  type AssocF = ByteF
-  lazy val assocW: Writer[Assoc, AssocF] = byteW.cmap((a: Assoc) => a match {
-    case L => 0:Byte
-    case R => 1:Byte
-    case N => 2:Byte
+  /**
+   * Pack 'Fixity' into a 'Word8'.
+   *
+   * Format:
+   *
+   * >  01234567
+   * >  ccaapppp
+   *
+   * cc is constructor tag,    @0-3@
+   * aa is associativity tag,  @0-2@
+   * pppp is precedence level, @0-9@
+   */
+  type FixityF = ByteF
+  lazy val fixityW: Writer[Fixity, FixityF] = byteW.cmap((f: Fixity) => f match {
+    case Idfix       => 0xC0.toByte
+    case Prefix(n)   => (0x40 | (0x0F & n)).toByte
+    case Postfix(n)  => (0x80 | (0x0F & n)).toByte
+    case Infix(a, n) => (packAssoc(a) | (0x0F & n)).toByte
   })
 
-  lazy val assocR: Reader[Assoc, AssocF] = byteR.map((b: Byte) => b match {
-    case 0 => L
-    case 1 => R
-    case 2 => N
+  private def packAssoc(a: Assoc): Byte = a match {
+    case L => 0x00
+    case R => 0x10
+    case N => 0x20
+  }
+
+  lazy val fixityR: Reader[Fixity, FixityF] = byteR.map(w8 => {
+    val n = 0x0F & w8
+    0xC0 & w8 match {
+      case 0x00 =>
+        0x30 & w8 match {
+          case 0x00 => Infix(L, n)
+          case 0x10 => Infix(R, n)
+          case 0x20 => Infix(N, n)
+          case _    => sys.error("unpackFixity: bad associativity")
+        }
+      case 0x40 => Prefix(n)
+      case 0x80 => Postfix(n)
+      case 0xC0 => Idfix
+    }
   })
 
-  type FixityF = S4[P2[AssocF, IntF], IntF, IntF, UnitF]
-  lazy val fixityW: Writer[Fixity, FixityF] = s4W(
-    tuple2W(assocW, intW), // Infix
-    intW,                  // Prefix
-    intW,                  // Postfix
-    unitW                  // Idfix
-  )((a,b,c,d) => (f: Fixity) => f match {
-    case Infix(assoc, l) => a((assoc, l))
-    case Prefix(i)       => b(i)
-    case Postfix(i)      => c(i)
-    case Idfix           => d(())
-  })
-
-  lazy val fixityR: Reader[Fixity, FixityF] = union4R(
-    tuple2R(assocR, intR).map{ case (a, l) => Infix(a, l) },
-    intR .map(Prefix),
-    intR .map(Postfix),
-    unitR.map(_ => Idfix)
-  )
-
-  type DigestF = LongF :: LongF
+  type DigestF = RepeatF[ByteF]
 
   val digestW: Writer[Digest, DigestF] =
-    tuple2W(longW, longW).cmap((d: Digest) => (d.part1, d.part2))
+    repeatW(byteW).cmap{ d: Digest =>
+      val os = new java.io.ByteArrayOutputStream(16)
+      Sinks.using(Sinks.toOutputStream(os)){ s => Write.longF(d.part1, s); Write.longF(d.part2, s) }
+      os.toByteArray
+    }
 
-  val digestR: Reader[Digest, DigestF] =
-    tuple2R(longR, longR).map{ case (p1, p2) => new Digest(p1, p2) }
+  val digestR: Reader[Digest, DigestF] = listR(byteR).map(bs => Digest(bs.toArray))
 
   type ModuleNameF = DigestF :: StringF :: StringF
 
@@ -263,7 +275,6 @@ object CoreSerialization {
   /**
    * When Haskell reads in a Module, it expects some extra information that Scala doesn't know about.
    *
-   *   _instances   :: Map ByteString Int,
    *   _types       :: Map Global (Type Void Void),
    *   _data        :: [DataType Void Void]
    *
@@ -276,5 +287,13 @@ object CoreSerialization {
    * way Haskell serializes Modules. One possibility is the include the length of the
    * information remaining, so that we can skip over it.
    */
-  type ModuleHaskell[F] = ModuleF[F] :: StreamF[UnitF] :: StreamF[UnitF] :: StreamF[UnitF]
+  type ModuleHaskell[F] = ModuleF[F] :: StreamF[UnitF] :: StreamF[UnitF]
+
+  def moduleWHaskell[V, F](vw: f0.Writer[V, F]): f0.Writer[Module[V], ModuleHaskell[F]] = tuple3W(
+    moduleW(vw), streamW(unitW), streamW(unitW)
+  ).cmap((m: Module[V]) => (m, Nil, Nil))
+
+  def moduleRHaskell[V, F](vr: Reader[V, F]): Reader[Module[V], ModuleHaskell[F]] = tuple3R(
+    moduleR(vr), streamR(unitR), streamR(unitR)
+  ).map{ case (m, _, _) => m }
 }

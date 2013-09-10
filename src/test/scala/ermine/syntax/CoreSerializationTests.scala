@@ -4,8 +4,7 @@ package syntax
 import org.scalacheck.{Shrink, Prop, Arbitrary}
 import org.scalacheck.Prop._
 import f0._
-import f0.Readers._
-import f0.Writers._
+import Readers._, Writers._, Formats._
 import scalaz._
 import Scalaz._
 import CoreArbitraryInstances._
@@ -21,10 +20,6 @@ object CoreSerializationTests extends ErmineProperties("CoreSerializationTests")
   test("instances == put/get instances")(clone(streamW(tuple2W(digestW, intW)), streamR(tuple2R(digestR, intR))))
   test("module == put/get module")(clone(moduleW(intW), moduleR(intR)))
 
-  def moduleWHaskell[V, F](vw: f0.Writer[V, F]): f0.Writer[Module[V], ModuleHaskell[F]] = tuple4W(
-    moduleW(vw), streamW(unitW), streamW(unitW), streamW(unitW)
-  ).cmap((m: Module[V]) => (m, Nil, Nil, Nil))
-
   def clone[A,F](w: f0.Writer[A,F], r: f0.Reader[A,F])(implicit eql: Equal[A], arb: Arbitrary[A], s: Shrink[A]): Prop =
     forAll((a: A) => { r(w.toByteArray(a)) === a })
 }
@@ -38,11 +33,16 @@ object RoundTripTest extends ErmineProperties("RoundTripTest") {
     Option(new File("../ermine/dist/build/core-echo/core-echo"    )).filter(_.exists)
   )
 
-  test("roundtrip")(forAll{(a: Core[Int]) => echo(a) })
-  test("floats")(forAll{(f: Float) => echo(LitFloat(f))})
-  test("doubles")(forAll{(d: Double) => echo(LitDouble(d))})
+  test("modules")(forAll{(a: Module[Int]) => echoModule(a) })
 
-  def echo(c:Core[Int]) = coreEcho.isDefined ==> (c === callHaskellEcho(coreW(intW), coreR(intR))(c))
+
+// TODO: Bring these back, maybe by beefing up the haskell coreecho process.
+//  test("cores")(forAll{(a: Core[Int]) => echo(a) })
+//  test("floats")(forAll{(f: Float) => echo(LitFloat(f))})
+//  test("doubles")(forAll{(d: Double) => echo(LitDouble(d))})
+//  def echo(c:Core[Int]) = coreEcho.isDefined ==> (c === callHaskellEcho(coreW(intW), coreR(intR))(c))
+
+  def echoModule(m:Module[Int]) = coreEcho.isDefined ==> (m === callHaskellEcho(moduleWHaskell(intW), moduleRHaskell(intR))(m))
 
   def callHaskellEcho[A, F](w: f0.Writer[A,F], r: f0.Reader[A,F])(aOut: A)(implicit eql: Equal[A], arb: Arbitrary[A]): A = {
     List(new File("core.in.toString"), new File("core.in"), new File("core.out")).foreach(_.delete)

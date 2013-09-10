@@ -90,9 +90,9 @@ object CoreArbitraryInstances {
   implicit val ArbitraryAssoc: Arbitrary[Assoc] = Arbitrary(oneOf(L, R, N))
 
   implicit val ArbitraryFixity: Arbitrary[Fixity] = Arbitrary(oneOf(
-    for { a <- arbitrary[Assoc]; l <- arbitrary[Int] } yield Infix(a, l),
-    arbitrary[Int]  .map(Prefix),
-    arbitrary[Int]  .map(Postfix),
+    for { a <- arbitrary[Assoc]; l <- Gen.choose(0,9) } yield Infix(a, l),
+    Gen.choose(0,9).map(Prefix),
+    Gen.choose(0,9).map(Postfix),
     Idfix
   ))
 
