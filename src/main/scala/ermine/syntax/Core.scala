@@ -4,6 +4,7 @@ import bound._
 import bound.Scope._
 import scalaz._
 import Scalaz._
+import syntax.order, syntax.semigroup
 import f0.{Read, Sources}
 import java.security.MessageDigest
 
@@ -29,24 +30,51 @@ sealed trait Assoc
   case object R extends Assoc
   case object N extends Assoc
 
-object Accoc {
-  implicit val assocEqual: Equal[Assoc] = Equal.equalA[Assoc]
+object Assoc {
+  implicit val assocOrder: Order[Assoc] = new Order[Assoc] {
+    override def equalIsNatural = true
+    def order(l: Assoc, r: Assoc) = (l, r) match {
+      case (L, L) => mzero[Ordering]
+      case (R, R) => mzero[Ordering]
+      case (N, N) => mzero[Ordering]
+      case (L, _) => Ordering.LT
+      case (_, L) => Ordering.GT
+      case (R, _) => Ordering.LT
+      case (N, _) => Ordering.GT
+    }
+  }
 }
 
 trait Fixity
   case class Infix(assoc:Assoc, level:Int) extends Fixity
   case class Prefix(level:Int) extends Fixity
   case class Postfix(level:Int) extends Fixity
-  case object IdFix extends Fixity
+  case object Idfix extends Fixity
 
 object Fixity {
-  implicit val fixityEqual: Equal[Fixity] = Equal.equalA[Fixity]
+  implicit val globalOrder: Order[Fixity] = new Order[Fixity] {
+    override def equalIsNatural = true
+    def order(l: Fixity, r: Fixity) = (l, r) match {
+      case (Infix(a1, l1), Infix(a2, l2)) => a1 ?|? a2 |+|  l1 ?|? l2
+      case (Prefix(l1),    Prefix(l2))    => l1 ?|? l2
+      case (Postfix(l1),   Postfix(l2))   => l1 ?|? l2
+      case (Idfix,         Idfix)         => mzero[Ordering]
+      case (Infix(_, _), _)               => Ordering.LT
+      case (_, Infix(_, _))               => Ordering.GT
+      case (Idfix, _)                     => Ordering.GT
+      case (_, Idfix)                     => Ordering.LT
+      case (Prefix(_), _)                 => Ordering.LT
+      case (Postfix(_), _)                => Ordering.GT
+    }
+  }
 }
 
 object Digest{
-  def apply(bytes: Array[Byte], original: Option[String] = None): Digest = {
+  def apply(bytes: Array[Byte], orig: Option[String] = None): Digest = {
     val s = Sources.fromArray(bytes)
-    new Digest(Read.longF(s), Read.longF(s), original.getOrElse(new String(bytes)))
+    new Digest(Read.longF(s), Read.longF(s)){
+      override val original = orig.orElse(Some(new String(bytes)))
+    }
   }
 
   def apply(strings: String*) : Digest = {
@@ -54,23 +82,31 @@ object Digest{
     strings.foreach(s => md.update(s.getBytes))
     Digest(md.digest, Some(strings.mkString(".")))
   }
-  implicit val digestEqual: Equal[Digest] = Equal.equalA[Digest]
+  implicit val globalOrder: Order[Digest] = Order.order((l, r) => l.part1 ?|? r.part1 |+|  l.part2 ?|? r.part2)
 }
-case class Digest(part1: Long, part2: Long, original: String)
+case class Digest(part1: Long, part2: Long){
+  val original: Option[String] = None
+}
 
 object ModuleName {
   def apply(pkg: String, name: String): ModuleName = {
     new ModuleName(Digest(pkg, name), pkg, name)
   }
-  implicit val moduleEqual: Equal[ModuleName] = Equal.equalA[ModuleName]
+  implicit val globalOrder: Order[ModuleName] = Order.order((l, r) => l.pkg ?|? r.pkg |+|  l.name ?|? r.name)
 }
 case class ModuleName(digest: Digest, pkg: String, name: String)
 
 object Global {
-  def apply(module: ModuleName, name: String, fixity: Fixity = IdFix): Global = {
+  def apply(module: ModuleName, name: String, fixity: Fixity = Idfix): Global = {
     new Global(Digest(module.pkg, module.name, name), fixity, module, name)
   }
-  implicit val globalEqual: Equal[Global] = Equal.equalA[Global]
+  implicit val globalOrder: Order[Global] = new Order[Global] {
+    override def equalIsNatural = Equal[ModuleName].equalIsNatural && Equal[Fixity].equalIsNatural
+    override def equal(l: Global, r: Global) = if (equalIsNatural) l == r else super.equal(l, r)
+    def order(l: Global, r: Global) = (l, r) match {
+      case (Global(_, f1, m1, n1), Global(_, f2, m2, n2)) => m1 ?|? m2 |+|  n1 ?|? n2 |+| f1 ?|? f2
+    }
+  }
 }
 case class Global(digest: Digest, fixity: Fixity, module: ModuleName, name: String)
 
@@ -88,7 +124,13 @@ case class Module[+A](
 }
 
 object Module {
-  implicit def ModuleEqual[V: Equal]: Equal[Module[V]] = Equal.equalA[Module[V]]
+  implicit def ModuleEqual[V: Equal]: Equal[Module[V]] = new Equal[Module[V]]{
+    def equal(a: Module[V], b: Module[V]): Boolean = (a, b) match {
+      case (Module(aname, adefs, aterms, ainsts), Module(bname, bdefs, bterms, binsts)) =>
+        aname === bname && adefs === bdefs && aterms === bterms && ainsts === binsts
+    }
+  }
+
   implicit val moduleEqual1: Equal1[Module] = new Equal1[Module] {
     def equal[V: Equal](m1: Module[V], m2: Module[V]) = m1 === m2
   }
@@ -217,7 +259,7 @@ object Core {
     def equal[V: Equal](c1: Core[V], c2: Core[V]) = c1 === c2
   }
 
-  implicit val coreMonad: Monad[Core] = new Monad[Core]{
+  implicit val coreMonad: Traverse[Core] with Monad[Core] = new Traverse[Core] with Monad[Core]{
     def point[A](a: => A) = Var(a)
     def bind[A,B](c: Core[A])(f: A => Core[B]): Core[B] = c match {
       case Var(a)         => f(a)
@@ -230,6 +272,27 @@ object Core {
       case Dict(xs, ys)   => Dict(xs.map(c => bind(c)(f)), ys.map(s => s >>>= f))
       case LamDict(e)     => LamDict(e >>>= f)
       case AppDict(x, y)  => AppDict(bind(x)(f), bind(y)(f))
+    }
+
+    // TODO: this + is unsound; see https://github.com/scalaz/scalaz/pull/328
+    def traverseImpl[F[+_], A, B](exp : Core[A])(f : A => F[B])(implicit A: Applicative[F]) : F[Core[B]] = {
+      def traverseScope[V](s: Scope[V, Core, A]) = s.traverse(f)
+      exp match {
+        case Var(a)         => f(a).map(Var(_))
+        case h: HardCore    => A.point(h)
+        case Data(n, xs)    => xs.traverse(traverse(_)(f)).map(Data(n, _))
+        case App(x, y)      => A.apply2(traverse(x)(f), traverse(y)(f))(App(_, _))
+        case Lam(a, e)      => e.traverse(f).map(Lam(a, _))
+        case Let(bs, b)     => A.apply2(bs.traverse(traverseScope), b.traverse(f))(Let(_, _))
+        case Case(e, bs, d) => A.apply3(
+          traverse(e)(f),
+          bs.toList.traverse{ case (i, (b, s)) => traverseScope(s).map(a => (i, (b, a))) }.map(_.toMap),
+          d.traverse(traverseScope)
+        )(Case(_, _, _))
+        case Dict(xs, ys)   => A.apply2(xs.traverse(traverse(_)(f)), ys.traverse(traverseScope))(Dict(_, _))
+        case LamDict(e)     => traverseScope(e).map(LamDict(_))
+        case AppDict(x, y)  => A.apply2(traverse(x)(f), traverse(y)(f))(AppDict(_, _))
+      }
     }
   }
 
@@ -256,26 +319,4 @@ object Core {
     case LamDict(e)     => print("LamDict", e.show)
     case AppDict(x, y)  => print("AppDict", x.show, y.show)
   })
-
-  val coreTraversable: Traverse[Core] = new Traverse[Core]{
-    def traverseImpl[F[+_], A, B](exp : Core[A])(f : A => F[B])(implicit A: Applicative[F]) : F[Core[B]] = {
-      def traverseScope[V](s: Scope[V, Core, A]) = s.traverse(f)(A, coreTraversable)
-      exp match {
-        case Var(a)         => f(a).map(Var(_))
-        case h: HardCore    => A.point(h)
-        case Data(n, xs)    => xs.traverse(traverse(_)(f)).map(Data(n, _))
-        case App(x, y)      => A.apply2(traverse(x)(f), traverse(y)(f))(App(_, _))
-        case Lam(a, e)      => e.traverse(f)(A, coreTraversable).map(Lam(a, _))
-        case Let(bs, b)     => A.apply2(bs.traverse(traverseScope), b.traverse(f)(A, coreTraversable))(Let(_, _))
-        case Case(e, bs, d) => A.apply3(
-          traverse(e)(f),
-          bs.toList.traverse{ case (i, (b, s)) => traverseScope(s).map(a => (i, (b, a))) }.map(_.toMap),
-          d.traverse(traverseScope)
-        )(Case(_, _, _))
-        case Dict(xs, ys)   => A.apply2(xs.traverse(traverse(_)(f)), ys.traverse(traverseScope))(Dict(_, _))
-        case LamDict(e)     => traverseScope(e).map(LamDict(_))
-        case AppDict(x, y)  => A.apply2(traverse(x)(f), traverse(y)(f))(AppDict(_, _))
-      }
-    }
-  }
 }

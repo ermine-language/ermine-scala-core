@@ -1,6 +1,7 @@
 package ermine.syntax
 
 import org.scalacheck._
+import Shrink._
 import Gen._
 import Arbitrary.arbitrary
 import bound.scalacheck.BoundArbitraryInstances._
@@ -27,7 +28,7 @@ object CoreArbitraryInstances {
   }
 
   implicit def ArbitraryCore[V](implicit av: Arbitrary[V]): Arbitrary[Core[V]] = Arbitrary(Gen.sized { size =>
-    def resize[T](g:Gen[T]) = Gen.resize(size / 2, g)
+    def resize[T](g:Gen[T]) = Gen.resize(size / 4, g)
     size match {
       case 0 => oneOf(for { v <- av.arbitrary } yield Var(v), ArbitraryHardCore.arbitrary)
       case n => oneOf(
@@ -89,13 +90,15 @@ object CoreArbitraryInstances {
   implicit val ArbitraryAssoc: Arbitrary[Assoc] = Arbitrary(oneOf(L, R, N))
 
   implicit val ArbitraryFixity: Arbitrary[Fixity] = Arbitrary(oneOf(
-    for { a <- arbitrary[Assoc]; l <- arbitrary[Int] } yield Infix(a, l),
-    arbitrary[Int]  .map(Prefix),
-    arbitrary[Int]  .map(Postfix),
-    IdFix
+    for { a <- arbitrary[Assoc]; l <- Gen.choose(0,9) } yield Infix(a, l),
+    Gen.choose(0,9).map(Prefix),
+    Gen.choose(0,9).map(Postfix),
+    Idfix
   ))
 
-  implicit val ArbitraryDigest: Arbitrary[Digest] = Arbitrary(arbitrary[String].map(Digest(_)))
+  implicit val ArbitraryDigest: Arbitrary[Digest] = Arbitrary(
+    for { p1 <- arbitrary[Long]; p2 <- arbitrary[Long] } yield new Digest(p1, p2)
+  )
 
   implicit val ArbitraryModuleName: Arbitrary[ModuleName] = Arbitrary(
     for { pkg <- arbitrary[String]; n <- arbitrary[String] } yield ModuleName(pkg, n)
@@ -106,11 +109,19 @@ object CoreArbitraryInstances {
   )
 
   implicit def ArbitraryModule[V](implicit av: Arbitrary[V]): Arbitrary[Module[V]] = Arbitrary(Gen.sized { size =>
-    def resize[T](g:Gen[T]) = Gen.resize(size / 2, g)
     for { mn    <- arbitrary[ModuleName]
-          defs  <- resize(arbitrary[List[Core[V]]])
+          defs  <- arbitrary[List[Core[V]]]
           terms <- arbitrary[Map[Global, Either[Global, V]]]
           insts <- arbitrary[Map[Digest, V]]
     } yield Module(mn, defs.toVector, terms, insts)
   })
+
+  implicit def shrinkModule[V](implicit s1: Shrink[V]): Shrink[Module[V]] = Shrink {
+    case Module(name, defs, terms, insts) =>
+      Stream(Module(name, Vector(), Map(), Map())) append
+      (for(ds <- shrink(defs))  yield Module(name, ds,       Map(), Map())) append
+      (for(ts <- shrink(terms)) yield Module(name, Vector(), ts,    Map())) append
+      (for(is <- shrink(insts)) yield Module(name, Vector(), Map(), is))
+  }
+
 }

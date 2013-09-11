@@ -117,7 +117,6 @@ trait CoreCombinators {
   implicit def globalToRef(g:Global) = GlobalRef(g)
 
   def closed[A, B](fa:Core[A]): Option[Core[B]] = {
-    implicit val x = Core.coreTraversable
     fa.traverse(Function.const(None))
   }
 }
