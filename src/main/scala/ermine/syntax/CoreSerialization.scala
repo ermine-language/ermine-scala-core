@@ -262,15 +262,15 @@ object CoreSerialization {
   def termExportsR[V, F](vr: Reader[V, F]): Reader[Map[Global, Either[Global, V]], TermExportsF[F]] =
     streamR(tuple2R(globalR, eitherR(globalR, vr))).map(_.toMap)
 
-  type ModuleF[F] = ModuleNameF :: StreamF[CoreF[F]] :: TermExportsF[F] :: StreamF[P2[DigestF, F]]
+  type ModuleF[F] = ModuleNameF :: StreamF[ModuleNameF] :: StreamF[CoreF[F]] :: TermExportsF[F] :: StreamF[P2[DigestF, F]]
 
-  def moduleW[V, F](vw: Writer[V, F]): Writer[Module[V], ModuleF[F]] = tuple4W(
-    moduleNameW, streamW(coreW(vw)), termExportsW(vw), streamW(tuple2W(digestW, vw))
-  ).cmap((m: Module[V]) => (m.name, m.definitions, m.termExports, m.instances.toStream))
+  def moduleW[V, F](vw: Writer[V, F]): Writer[Module[V], ModuleF[F]] = tuple5W(
+    moduleNameW, streamW(moduleNameW), streamW(coreW(vw)), termExportsW(vw), streamW(tuple2W(digestW, vw))
+  ).cmap((m: Module[V]) => (m.name, m.dependencies, m.definitions, m.termExports, m.instances.toStream))
 
-  def moduleR[V, F](vr: Reader[V, F]): Reader[Module[V], ModuleF[F]] = tuple4R(
-    moduleNameR, streamR(coreR(vr)), termExportsR(vr), streamR(tuple2R(digestR, vr))
-  ).map{ case (m, defs, terms, insts) => Module(m, defs.toVector, terms, insts.toMap) }
+  def moduleR[V, F](vr: Reader[V, F]): Reader[Module[V], ModuleF[F]] = tuple5R(
+    moduleNameR, streamR(moduleNameR), streamR(coreR(vr)), termExportsR(vr), streamR(tuple2R(digestR, vr))
+  ).map{ case (m, deps, defs, terms, insts) => Module(m, deps, defs.toVector, terms, insts.toMap) }
 
   /**
    * When Haskell reads in a Module, it expects some extra information that Scala doesn't know about.

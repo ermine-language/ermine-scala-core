@@ -110,18 +110,20 @@ object CoreArbitraryInstances {
 
   implicit def ArbitraryModule[V](implicit av: Arbitrary[V]): Arbitrary[Module[V]] = Arbitrary(Gen.sized { size =>
     for { mn    <- arbitrary[ModuleName]
+          deps  <- arbitrary[List[ModuleName]]
           defs  <- arbitrary[List[Core[V]]]
           terms <- arbitrary[Map[Global, Either[Global, V]]]
           insts <- arbitrary[Map[Digest, V]]
-    } yield Module(mn, defs.toVector, terms, insts)
+    } yield Module(mn, deps, defs.toVector, terms, insts)
   })
 
   implicit def shrinkModule[V](implicit s1: Shrink[V]): Shrink[Module[V]] = Shrink {
-    case Module(name, defs, terms, insts) =>
-      Stream(Module(name, Vector(), Map(), Map())) append
-      (for(ds <- shrink(defs))  yield Module(name, ds,       Map(), Map())) append
-      (for(ts <- shrink(terms)) yield Module(name, Vector(), ts,    Map())) append
-      (for(is <- shrink(insts)) yield Module(name, Vector(), Map(), is))
+    case Module(name, deps, defs, terms, insts) =>
+      Stream(Module(name, Nil, Vector(), Map(), Map())) append
+      (for(ds <- shrink(deps))  yield Module(name, deps, Vector(), Map(), Map())) append
+      (for(ds <- shrink(defs))  yield Module(name, Nil,  ds,       Map(), Map())) append
+      (for(ts <- shrink(terms)) yield Module(name, Nil,  Vector(), ts,    Map())) append
+      (for(is <- shrink(insts)) yield Module(name, Nil,  Vector(), Map(), is))
   }
 
 }

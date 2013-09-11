@@ -86,10 +86,10 @@ trait CoreCombinators {
       Let(es.map(t => abstr(t._2)), abstr(e))
   }
 
-  def module(name: String)(defs: (String, Core[String])*)(instances: (String, Core[String])*): Module[Int] = {
+  def module(name: String, deps: List[ModuleName] = Nil)(defs: (String, Core[String])*)(instances: (String, Core[String])*): Module[Int] = {
     val mn = name.m
     val names = defs.map(_._1) ++ instances.map(_._1)
-    Module(mn,
+    Module(mn, deps,
       definitions = (defs.map(_._2).toVector ++ instances.map(_._2).toVector).map(_.map(name => {
         val index = names.indexOf(name)
         if(index >= 0) index else throw new RuntimeException(s"name not found: $name")

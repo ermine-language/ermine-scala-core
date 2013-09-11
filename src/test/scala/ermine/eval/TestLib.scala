@@ -41,7 +41,7 @@ object TestLib extends CoreCombinators {
     "-" -> PrimOp("minusInt"),
     "+" -> PrimOp("plusInt")
   )(
-    "eqInt" -> dict("==" -> (("a", "b") !: (PrimOp("eqInt") * v"a" * v"b"))),
+    "eqInt"   -> dict("==" -> (("a", "b") !: (PrimOp("eqInt") * v"a" * v"b"))),
     "showInt" -> dict("show" -> ("i" !: g"String.stringValueOfInt" * v"i"))
   )
 
@@ -55,9 +55,9 @@ object TestLib extends CoreCombinators {
     "pi" -> ForeignValue(static=true, "java.lang.Math", "PI")
   )()
 
-  val listModule = module("List")(
-    "Nil" -> CoreData(0, Nil),
-    "Cons" -> (("head", "tail") !: CoreData(1, List(v"head", v"tail"))),
+  val listModule = module("List", List(m"Bool", m"Int", m"String"))(
+    "Nil"   -> CoreData(0, Nil),
+    "Cons"  -> (("head", "tail") !: CoreData(1, List(v"head", v"tail"))),
     "take"  -> (("n", "xs") !:
       g"Bool.if" * eqInt(v"n", 0) * v"Nil" * cases(v"xs",
         0 -> (Nil -> v"Nil"),

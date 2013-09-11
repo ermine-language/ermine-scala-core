@@ -111,10 +111,11 @@ object Global {
 case class Global(digest: Digest, fixity: Fixity, module: ModuleName, name: String)
 
 case class Module[+A](
-  name:        ModuleName,
-  definitions: Vector[Core[A]],
-  termExports: Map[Global, Either[Global, A]],
-  instances:   Map[Digest, A]) {
+  name:         ModuleName,
+  dependencies: List[ModuleName],
+  definitions:  Vector[Core[A]],
+  termExports:  Map[Global, Either[Global, A]],
+  instances:    Map[Digest, A]) {
   def map[B](f: A => B): Module[B] =
     copy(
       definitions = definitions.map(_.map(f)),
@@ -126,8 +127,8 @@ case class Module[+A](
 object Module {
   implicit def ModuleEqual[V: Equal]: Equal[Module[V]] = new Equal[Module[V]]{
     def equal(a: Module[V], b: Module[V]): Boolean = (a, b) match {
-      case (Module(aname, adefs, aterms, ainsts), Module(bname, bdefs, bterms, binsts)) =>
-        aname === bname && adefs === bdefs && aterms === bterms && ainsts === binsts
+      case (Module(aname, adeps, adefs, aterms, ainsts), Module(bname, bdeps, bdefs, bterms, binsts)) =>
+        aname === bname && adeps === bdeps && adefs === bdefs && aterms === bterms && ainsts === binsts
     }
   }
 
