@@ -105,20 +105,23 @@ object TestLib extends CoreCombinators {
       "unit" -> ("a" !: mkList(v"a")),
       ">>="  -> (("xs", "f") !: (v"concat" * (v"map" * v"f" * v"xs")))
     ),
-    "showBoolList" -> AppDict(ShowList,i"showBool"),
-    "showIntList"  -> AppDict(ShowList,i"showInt")
+    "showBoolList" -> AppDict(ShowList, i"showBool"),
+    "showIntList"  -> AppDict(ShowList, i"showInt")
   )
 
   // helper functions
-  def eqb(a:Core[String], b: Core[String]) = AppDict(Slot(0), i"eqBool") * a * b
-  def showBool(c: Core[String]) = AppDict(Slot(0), i"showBool") * c
-  def eqInt(a:Core[String], b: Core[String]) = AppDict(Slot(0), i"eqInt") * a * b
-  def showBoolList(c: Core[String]) = AppDict(Slot(0), i"showBoolList") * c
-  def showIntList(c: Core[String])  = AppDict(Slot(0), i"showIntList")  * c
-  def mkList(input:Core[String]*) = input.foldRight[Core[String]](GlobalRef(g"List.Nil")){ (c, acc) => g"List.Cons" * c * acc }
+  def appD0(c: Core[String])                 = AppDict(Slot(0), c)
+  def eqb(a:Core[String], b: Core[String])   = appD0(i"eqBool")       * a * b
+  def showBool(c: Core[String])              = appD0(i"showBool")     * c
+  def eqInt(a:Core[String], b: Core[String]) = appD0(i"eqInt")        * a * b
+  def showBoolList(c: Core[String])          = appD0(i"showBoolList") * c
+  def showIntList(c: Core[String])           = appD0(i"showIntList")  * c
+  def mkList(input:Core[String]*)            = input.foldRight[Core[String]](GlobalRef(g"List.Nil"))(cons)
+  def cons(h: Core[String], t: Core[String]) = g"List.Cons" * h * t
+
   def ShowList: Core[String] = lamDict("d")(dict(
-    "show" -> ("l" !: cases(g"List.intersperse" * LitString(",") * (g"List.map" * AppDict(Slot(0), v"d") * v"l"),
+    "show" -> ("l" !: cases(g"List.intersperse" * LitString(",") * (g"List.map" * appD0(v"d") * v"l"),
       0 -> (Nil -> LitString("[]")),
-      1 -> (List("h", "t") -> g"String.append" * (g"String.append" * LitString("[") * (g"List.joinStringList" * (g"List.Cons" * v"h" * v"t"))) *  LitString("]"))
+      1 -> (List("h", "t") -> g"String.append" * (g"String.append" * LitString("[") * (g"List.joinStringList" * cons(v"h", v"t"))) *  LitString("]"))
   ))))
 }
