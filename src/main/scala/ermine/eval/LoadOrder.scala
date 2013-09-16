@@ -24,12 +24,12 @@ object LoadOrder {
      *   For everyone who depends on it, decrement their count in the counts map,
      *   because they now depend on one fewer modules that need to be loaded.
      *
-     * @param m
+     * @param a
      * @return
      */
-    def load(m: A) = DepGraph[A](
-      deps - m,
-      (if(deps contains m) deps(m).map(_ -> -1).toMap |+| counts else counts) - m
+    def load(a: A) = DepGraph[A](
+      deps - a,
+      (if(deps contains a) deps(a).map(_ -> -1).toMap |+| counts else counts) - a
     )
 
     /**
@@ -51,14 +51,17 @@ object LoadOrder {
 
   /**
    * Starting from point a, build a DepGraph from the transitive closure of a's dependencies.
-   * @param a
+   * @param as
    * @param depenencies
    * @tparam A
    * @return
    */
-  def getDepGraph[A](a: A, depenencies: A => Set[A]): DepGraph[A] = {
-    val depsOfA = depenencies(a).toList
-    val dgForA  = DepGraph[A](depsOfA.map(_ -> Set(a)).toMap, Map(a -> depsOfA.size))
-    depsOfA.foldLeft(dgForA){ case (dacc, m) => dacc ++ getDepGraph(m, depenencies) }
+  def getDepGraph[A](as: A*)(depenencies: A => Set[A]): DepGraph[A] = {
+    def getDepGraph(a: A): DepGraph[A] = {
+      val depsOfA = depenencies(a)
+      val depGraphForA  = DepGraph[A](depsOfA.map(_ -> Set(a)).toMap, Map(a -> depsOfA.size))
+      depsOfA.foldLeft(depGraphForA){ case (dacc, m) => dacc ++ getDepGraph(m) }
+    }
+    as.foldLeft(DepGraph[A](Map(), Map())){ case (dacc, m) => dacc ++ getDepGraph(m) }
   }
 }

@@ -35,7 +35,7 @@ object LoadOrderTests extends ErmineProperties("Load Order") {
   )
 
   def testDeps[A : Equal](name: String)(a: A, deps: Map[A, Set[A]])(expected: List[List[A]]) = test(name){
-    val res = getDepGraph(a, deps).ordered.toList.map(_.toList)
+    val res = getDepGraph(a)(deps).ordered.toList.map(_.toList)
     println(res)
     res === expected
   }

@@ -44,7 +44,10 @@ object EvalExamples extends ErmineProperties("EvalExamples") with CoreCombinator
   evalTestBottom("seq with err", g"Prelude.seq" * Err("seq death!") * 5, "seq death!")
 
   def evl(c:Core[String]) = {
-    Eval.sessionEnv = SessionEnv.load(prelude, stringModule, boolModule, intModule, tupleModule, mathModule, listModule)
+    val allModules = List(prelude, stringModule, boolModule, intModule, tupleModule, mathModule, listModule)
+    val modulesMap = allModules.map(m => m.name -> m).toMap
+    val ordered = LoadOrder.getDepGraph(allModules:_*)(m => m.dependencies.map(modulesMap).toSet).ordered
+    Eval.sessionEnv = SessionEnv.load(ordered.force.flatten:_*)  //SessionEnv.load()
     Eval.whnf(Eval.eval(Eval.sessionEnv.env, closed(c).get))
   }
   def evalTest(name: String, c:Core[String], expectedResult:Prim) = test(name){
