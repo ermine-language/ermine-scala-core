@@ -38,15 +38,15 @@ object Eval {
       case Nil => Func(1, { case List(Evidence(sups, _)) => sups(b.toInt) })
     }
 
-    case Slot(b)          => stk match {
+    case Slot(b)           => stk match {
       case Evidence(_, slots) :: rest => appl(slots(b.toInt), rest)
       case (x :: _) => panic(s"Slot applied to non-dictionary $x")
       case Nil => Func(1, { case List(Evidence(_, slots)) => slots(b.toInt) })
     }
 
-    case GlobalRef(g) => appl(env(sessionEnv.globs(g)), stk)
+    case GlobalRef(g)      => appl(env(sessionEnv.globs(g)), stk)
 
-    case InstanceRef(d) => appl(env(sessionEnv.digests(d)), stk)
+    case InstanceRef(d)    => appl(env(sessionEnv.digests(d)), stk)
 
     case Err(msg)          => Bottom(die(msg))
 
@@ -89,7 +89,7 @@ object Eval {
 
     case AppDict(x, y)  =>  eval(env, x, evalDict(env, y) :: stk)
 
-    case PrimOp(name) => appl(PrimOps.primOpDefs(name), stk)
+    case PrimOp(name)   => appl(PrimOps.primOpDefs(name), stk)
 
     case f@ForeignMethod(static, _, _, _) => {
       def mk: Runtime =

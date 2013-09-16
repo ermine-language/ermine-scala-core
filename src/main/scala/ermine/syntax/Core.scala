@@ -94,7 +94,9 @@ object ModuleName {
   }
   implicit val globalOrder: Order[ModuleName] = Order.order((l, r) => l.pkg ?|? r.pkg |+|  l.name ?|? r.name)
 }
-case class ModuleName(digest: Digest, pkg: String, name: String)
+case class ModuleName(digest: Digest, pkg: String, name: String){
+  override def toString = s"$pkg.$name"
+}
 
 object Global {
   def apply(module: ModuleName, name: String, fixity: Fixity = Idfix): Global = {
