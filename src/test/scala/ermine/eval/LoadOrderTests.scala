@@ -9,6 +9,13 @@ import Scalaz._
 
 object LoadOrderTests extends ErmineProperties("Load Order") {
 
+  /**
+   *      a
+   *    /   \
+   *    x   y
+   *     \ /
+   *      z
+   */
   val diamond: Map[String, Set[String]] = Map(
     "z" -> Set("x", "y"),
     "x" -> Set("a"),
@@ -18,7 +25,15 @@ object LoadOrderTests extends ErmineProperties("Load Order") {
   testDeps("diamond:x")("x", diamond)(List(List("a"), List("x")))
   testDeps("diamond:a")("a", diamond)(List(List("a")))
 
-  testDeps("diamond")("z", diamond)(List(List("a"), List("x", "y"), List("z")))
+  /**
+   *            b
+   *           /
+   *          a
+   *         /
+   *    x   y
+   *     \ /
+   *      z
+   */
   val twoRoots: Map[String, Set[String]] = Map(
     "z" -> Set("x", "y"),
     "x" -> Set(),
