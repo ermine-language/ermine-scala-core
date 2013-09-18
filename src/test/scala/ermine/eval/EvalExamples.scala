@@ -9,7 +9,8 @@ import TestLib._
 object EvalExamples extends ErmineProperties("EvalExamples") with CoreCombinators {
 
   evalTest("showBool True", showBool(g"Bool.True"), Prim("True"))
-  evalTest("pair", showBool(eqb(g"Bool.True", g"Tuple.snd" * (g"Tuple.Pair" * 1 * g"Bool.False"))), Prim("False"))
+  evalTest("pair fst'", g"Tuple.fst" * (g"Tuple.Pair" * 1 * 1), Prim(1))
+  evalTest("pair snd", showBool(eqb(g"Bool.True", g"Tuple.snd" * (g"Tuple.Pair" * 1 * g"Bool.False"))), Prim("False"))
   evalTest("True", showBool(g"Bool.True"), Prim("True"))
   evalTest(
     "show bool list",
@@ -47,7 +48,7 @@ object EvalExamples extends ErmineProperties("EvalExamples") with CoreCombinator
     val allModules = List(prelude, stringModule, boolModule, intModule, tupleModule, mathModule, listModule)
     val modulesMap = allModules.map(m => m.name -> m).toMap
     val ordered = LoadOrder.getDepGraph(allModules:_*)(m => m.dependencies.map(modulesMap).toSet).ordered
-    Eval.sessionEnv = SessionEnv.load(ordered.force.flatten:_*)  //SessionEnv.load()
+    Eval.sessionEnv = SessionEnv.load(ordered.force.flatten:_*)
     Eval.whnf(Eval.eval(Eval.sessionEnv.env, closed(c).get))
   }
   def evalTest(name: String, c:Core[String], expectedResult:Prim) = test(name){

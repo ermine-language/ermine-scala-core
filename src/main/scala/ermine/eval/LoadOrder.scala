@@ -6,10 +6,15 @@ import std.map._, std.set._, std.anyVal._, syntax.semigroup._
 object LoadOrder {
 
   /**
-   * @param deps Map from A to the set of A's that depend on that A
+   * @param deps   Map from A to the set of A's that depend on that A
    * @param counts Map from A to the number of unloaded A's that that A depends on
    */
-  case class DepGraph[A](deps: Map[A, Set[A]], counts: Map[A, Int]) {
+  case class DepGraph[A: Equal](deps: Map[A, Set[A]], counts: Map[A, Int]) {
+
+    def map[B: Equal](f: A => B) = this.copy(
+      deps   = deps.map  { case (k,v) => (f(k), v.map(f)) },
+      counts = counts.map{ case (k,v) => (f(k), v) }
+    )
 
     /**
      * Smash together two dependency graphs by:
@@ -56,12 +61,14 @@ object LoadOrder {
    * @tparam A
    * @return
    */
-  def getDepGraph[A](as: A*)(depenencies: A => Set[A]): DepGraph[A] = {
+  def getDepGraph[A: Equal](as: A*)(depenencies: A => Set[A]): DepGraph[A] = {
     def getDepGraph(a: A): DepGraph[A] = {
       val depsOfA = depenencies(a)
-      val depGraphForA  = DepGraph[A](depsOfA.map(_ -> Set(a)).toMap, Map(a -> depsOfA.size))
-      depsOfA.foldLeft(depGraphForA){ case (dacc, m) => dacc ++ getDepGraph(m) }
+      DepGraph[A](depsOfA.map(_ -> Set(a)).toMap, Map(a -> depsOfA.size))
     }
-    as.foldLeft(DepGraph[A](Map(), Map())){ case (dacc, m) => dacc ++ getDepGraph(m) }
+    def transitiveDeps(a: A): Set[A] =
+      Set(a) ++ depenencies(a).foldLeft(Set[A]()){ case (s, a) => s ++ transitiveDeps(a) }
+    val all: Set[A] = as.flatMap(transitiveDeps).toSet
+    all.foldLeft(DepGraph[A](Map(), Map())){ case (dacc, a) => dacc ++ getDepGraph(a) }
   }
 }

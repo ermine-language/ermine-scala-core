@@ -10,7 +10,7 @@ object SessionEnv {
 
 case class SessionEnv(env: Env = Map(), globs: Map[Global, Address] = Map(), digests: Map[Digest, Address] = Map()){
   def processModule(mod: Module[Int]): SessionEnv = {
-    val addrs = mod.definitions.map(_ => new Address)
+    val addrs: Vector[Address] = mod.definitions.map(_ => Address("processModule"))
     val amod  = mod.map(i => addrs(i))
     var newEnv : Env = null
     newEnv = this.env ++ amod.definitions.zip(addrs).map({ case (c, a) => a -> Thunk(newEnv, c, true) }).toMap
@@ -60,7 +60,7 @@ object Eval {
       // this case doesn't use java stack
       if(stk.length >= n) stk.splitAt(n.toInt) match {
         case (args, rest) =>
-          val addrs = args.map(_ => new Address)
+          val addrs = args.map(_ => Address("lam"))
           val newEnv = addrs.zip(args).toMap ++ env
           eval(newEnv, e.instantiate(b => Var(addrs(b.toInt))), rest)
       }
@@ -69,7 +69,7 @@ object Eval {
 
     case Let(bs, e)     =>
       var newEnv : Env = null
-      val addrs = bs.map(_ => new Address)
+      val addrs = bs.map(_ => Address("let"))
       val ibs = bs.map(b => b.instantiate(i => Var(addrs(i))))
       newEnv = env ++ addrs.zip(ibs).map { case (addr, b) => addr -> Thunk(newEnv, b, true) }
       eval(newEnv, e.instantiate(i => Var(addrs(i))), stk)
@@ -83,7 +83,7 @@ object Eval {
     case LamDict(e)     => stk match {
       case Nil => Func(1, evalLam(env, e)(_ => 0))
       case dict :: rest =>
-        val addr = new Address
+        val addr = Address("lamdict")
         eval(env + (addr -> dict), e.instantiate(_ => Var(addr)), rest)
     }
 
@@ -130,7 +130,7 @@ object Eval {
   def buildDict(env: Env, supers: List[Core[Address]], slots: List[Scope[Byte, Core, Address]]) = {
     val esupers = supers.map(eval(env, _))
     var newEnv : Env = null
-    val slotAddrs = slots.map(_ => new Address)
+    val slotAddrs = slots.map(_ => Address("buildDict"))
     val eslots = slots.map(b => Thunk(newEnv, b.instantiate(i => Var(slotAddrs(i))), true))
     newEnv = env ++ slotAddrs.zip(eslots).toMap
     Evidence(esupers, eslots)
@@ -139,7 +139,7 @@ object Eval {
   def evalDict(env: Env, y: Core[Address]) = whnf(eval(env, y))
 
   private def evalLam[T](env: Env, s:Scope[T, Core, Address])(f: T => Int): List[Runtime] => Runtime = l => {
-    val addrs = l.map(_ => new Address)
+    val addrs = l.map(_ => Address("evalLam"))
     val newEnv = addrs.zip(l).toMap ++ env
     eval(newEnv, s.instantiate(b => Var(addrs(f(b)))))
   }
@@ -147,7 +147,7 @@ object Eval {
   private def pickBranch(env: Env, c: Core[Address],
                          branches: Map[Byte, (Byte, Scope[Byte, Core, Address])],
                          default: Option[Scope[Unit, Core, Address]]): (Core[Address], Env) = {
-    lazy val evaledAddr = new Address
+    lazy val evaledAddr = Address("pickBranch:top")
     def defaultCase(e: Runtime): (Core[Address], Env) = (default.get.instantiate(_ => Var(evaledAddr)), Map(evaledAddr -> e))
 
     whnf(eval(env, c)) match {
@@ -155,7 +155,7 @@ object Eval {
       case d@Data(tag, fields) =>
         branches.get(tag) match {
           case Some((_, body)) =>
-            val addrs = fields.map(_ => new Address)
+            val addrs = fields.map(_ => Address("pickBranch:body"))
             (body.instantiate(b => Var((evaledAddr :: addrs)(b.toInt))), ((evaledAddr,d) :: addrs.zip(fields)).toMap)
           case None if default.isDefined => defaultCase(d)
           case _ => panic("non-exhaustive case statement without default")

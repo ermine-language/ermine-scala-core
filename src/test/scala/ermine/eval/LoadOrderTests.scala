@@ -21,9 +21,9 @@ object LoadOrderTests extends ErmineProperties("Load Order") {
     "x" -> Set("a"),
     "y" -> Set("a"),
     "a" -> Set())
-  testDeps("diamond:z")("z", diamond)(List(List("a"), List("x", "y"), List("z")))
-  testDeps("diamond:x")("x", diamond)(List(List("a"), List("x")))
-  testDeps("diamond:a")("a", diamond)(List(List("a")))
+  testDeps("diamond:z")("z")(diamond)(List(List("a"), List("x", "y"), List("z")))
+  testDeps("diamond:x")("x")(diamond)(List(List("a"), List("x")))
+  testDeps("diamond:a")("a")(diamond)(List(List("a")))
 
   /**
    *            b
@@ -40,18 +40,35 @@ object LoadOrderTests extends ErmineProperties("Load Order") {
     "y" -> Set("a"),
     "a" -> Set("b"),
     "b" -> Set())
-  testDeps("twoRoots:z")("z", twoRoots)(List(List("x", "b"), List("a"), List("y"), List("z")))
-  testDeps("twoRoots:y")("y", twoRoots)(List(List("b"), List("a"), List("y")))
+  testDeps("twoRoots:z")("z")(twoRoots)(List(List("x", "b"), List("a"), List("y"), List("z")))
+  testDeps("twoRoots:y")("y")(twoRoots)(List(List("b"), List("a"), List("y")))
 
-  val modules  = List(prelude, stringModule, boolModule, intModule, tupleModule, mathModule, listModule)
+  /**
+   *      String
+   *        |   \
+   * Bool   |    Int
+   *    \   |   /
+   *     \  |  /
+   *       List
+   */
+  val mods: Map[String, Set[String]] = Map(
+    "List"   -> Set("Int", "String", "Bool"),
+    "Int"    -> Set("String"),
+    "Bool"   -> Set(),
+    "String" -> Set())
+  testDeps("mods")("List", "Int", "String", "Bool")(mods)(List(List("String", "Bool"), List("Int"), List("List")))
+
+
+  val modules =
+    List(prelude, stringModule, boolModule, intModule, tupleModule, mathModule, listModule)
   val modDeps = modules.map(m => m.name.toString -> m.dependencies.map(_.toString).toSet).toMap
-  testDeps("modules")(listModule.name.toString, modDeps)(
-    List(List("ermine.Bool", "ermine.Int", "ermine.String"), List("ermine.List"))
+  testDeps("modules")(modules.map(_.name.toString):_*)(modDeps)(
+    List(List("ermine.String", "ermine.Tuple", "ermine.Prelude", "ermine.Math", "ermine.Bool"), List("ermine.Int"), List("ermine.List"))
   )
 
-  def testDeps[A : Equal](name: String)(a: A, deps: Map[A, Set[A]])(expected: List[List[A]]) = test(name){
-    val res = getDepGraph(a)(deps).ordered.toList.map(_.toList)
-    println(res)
+  def testDeps[A : Equal](name: String)(as: A*)(deps: Map[A, Set[A]])(expected: List[List[A]]) = test(name){
+    val res = getDepGraph(as:_*)(deps).ordered.toList.map(_.toList)
+    //println(res)
     res === expected
   }
 }

@@ -6,7 +6,15 @@ import Runtime.Env
 /**
  * A type of addresses, to be used as unique identifiers in an environment map.
  */
-class Address
+object Address {
+  var count = 0
+  def apply(info: String): Address = synchronized {
+    val a = new Address(count, info)
+    count = count + 1
+    a
+  }
+}
+case class Address(id: Int, info: String)
 
 case class Death(error: String, base: Exception = null) extends Exception(error, base)
 

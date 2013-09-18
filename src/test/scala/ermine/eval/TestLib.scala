@@ -37,7 +37,7 @@ object TestLib extends CoreCombinators {
   , ("replaceChar", ForeignMethod(static=false, "java.lang.String", "replace", List("char", "char")))
   )()
 
-  val intModule = module("Int")(
+  val intModule = module("Int", List(m"String"))(
     "-" -> PrimOp("minusInt"),
     "+" -> PrimOp("plusInt")
   )(

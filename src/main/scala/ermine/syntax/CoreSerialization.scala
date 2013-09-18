@@ -296,4 +296,8 @@ object CoreSerialization {
   def moduleRHaskell[V, F](vr: Reader[V, F]): Reader[Module[V], ModuleHaskell[F]] = tuple3R(
     moduleR(vr), streamR(unitR), streamR(unitR)
   ).map{ case (m, _, _) => m }
+
+  def readModule(moduleFile: String): Module[Int] = {
+    Sources.fromFile(moduleFile).apply(moduleRHaskell(intR))
+  }
 }
