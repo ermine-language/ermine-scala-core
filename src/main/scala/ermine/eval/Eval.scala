@@ -1,205 +1,72 @@
-package ermine.eval
+package ermine
+package eval
 
-import bound.Scope
-import ermine.syntax.{Data => CoreData, _}
-import Runtime.Env
+import syntax.G._
 
-object SessionEnv {
-  def load(modules: Module[Int]*): SessionEnv = new SessionEnv().processModules(modules.toList)
-}
+object GEval {
 
-case class SessionEnv(env: Env = Map(), globs: Map[Global, Address] = Map(), digests: Map[Digest, Address] = Map()){
-  def processModule(mod: Module[Int]): SessionEnv = {
-    val addrs: Vector[Address] = mod.definitions.map(_ => Address("processModule"))
-    val amod  = mod.map(i => addrs(i))
-    var newEnv : Env = null
-    newEnv = this.env ++ amod.definitions.zip(addrs).map({ case (c, a) => a -> Thunk(newEnv, c, true) }).toMap
-    SessionEnv(newEnv, this.globs ++ amod.termExports.map {
-      case (g1, Left(g2))    => g1 -> this.globs(g2)
-      case (g1, Right(addr)) => g1 -> addr
-    }, this.digests ++ amod.instances)
-  }
-  def processModules(modules: List[Module[Int]]): SessionEnv = modules.foldLeft(this)(_.processModule(_))
-}
+  class Address(var value: Closure)
 
-object Eval {
+  sealed abstract class Closure
+    case object BlackHole extends Closure
+    case class PartialApplication(code: LambdaForm, env: Env, arity: Sorted[Int]) extends Closure
+    case class PlainClosure(code: LambdaForm, env: Env) extends Closure
+    // case class PrimClosure(wat?) extends Closure
 
-  def die(msg: String) = throw Death(msg)
+  case class Env(envB: Vector[Address], envU: Vector[Long], envN: Vector[Any])
 
-  var sessionEnv: SessionEnv = null
+  sealed abstract class Frame
+    case class Branch(branches: Continuation, env: Env) extends Frame
+    case class Update(addr: Address) extends Frame
 
-  @annotation.tailrec
-  final def eval(env: Env, core: Core[Address], stk: List[Runtime] = Nil): Runtime = core match {
-    case Var(a)            => appl(env.getOrElse(a, panic(s"bad variable reference $a")), stk)
+  case class MachineState(
+    stackP: Sorted[Int],
+    frameP: Sorted[Int],
+    stackF: List[(Sorted[Int], Frame)],
+    // genv: Map[Id, Address],
+    trace: String => Unit,
+    stackB: Array[Address],
+    stackU: Array[Long],
+    stackN: Array[Any]
+  ) {
+    def subSorted(a: Sorted[Int], b: Sorted[Int]): Sorted[Int] =
+      Sorted(a.b - b.b, a.u - b.u, a.n - b.n)
+    def addSorted(a: Sorted[Int], b: Sorted[Int]): Sorted[Int] =
+      Sorted(a.b + b.b, a.u + b.u, a.n + b.n)
 
-    case Super(b)          => stk match {
-      case Evidence(sups, _) :: rest => appl(sups(b.toInt), rest)
-      case x :: _ => panic(s"Super applied to non-dictionary $x")
-      case Nil => Func(1, { case List(Evidence(sups, _)) => sups(b.toInt) })
-    }
-
-    case Slot(b)           => stk match {
-      case Evidence(_, slots) :: rest => appl(slots(b.toInt), rest)
-      case (x :: _) => panic(s"Slot applied to non-dictionary $x")
-      case Nil => Func(1, { case List(Evidence(_, slots)) => slots(b.toInt) })
-    }
-
-    case GlobalRef(g)      => appl(env(sessionEnv.globs(g)), stk)
-
-    case InstanceRef(d)    => appl(env(sessionEnv.digests(d)), stk)
-
-    case Err(msg)          => Bottom(die(msg))
-
-    case l: Lit            => appl(Prim(l.extract), stk)
-
-    case CoreData(tag, cs) => appl(Data(tag, cs.map(Thunk(env, _, true))), stk)
-
-    case App(x, y)         => eval(env, x, Thunk(env, y, true) :: stk)
-
-    case Lam(n, e)         =>
-      // this case doesn't use java stack
-      if(stk.length >= n) stk.splitAt(n.toInt) match {
-        case (args, rest) =>
-          val addrs = args.map(_ => Address("lam"))
-          val newEnv = addrs.zip(args).toMap ++ env
-          eval(newEnv, e.instantiate(b => Var(addrs(b.toInt))), rest)
+    def pop(args: Sorted[Int] = Sorted(0,0,0)): Option[(Frame, MachineState)] =
+      stackF match {
+        case (ofp, fr) :: fs =>
+          Some((fr, squash(subSorted(frameP, stackP), args)
+            .copy(frameP = ofp, stackF = fs)))
+          case Nil => None
       }
-      // TODO: this case does...
-      else appl(Func(n, evalLam(env, e)(_.toInt)), stk)
+    def squash(size: Sorted[Int], args: Sorted[Int]): MachineState = {
+      def copyArgs[A](stk: Array[A], sp: Int, sz: Int, ar: Int) =
+        Array.copy(stk, sp, stk, sp + sz - ar, ar)
 
-    case Let(bs, e)     =>
-      var newEnv : Env = null
-      val addrs = bs.map(_ => Address("let"))
-      val ibs = bs.map(b => b.instantiate(i => Var(addrs(i))))
-      newEnv = env ++ addrs.zip(ibs).map { case (addr, b) => addr -> Thunk(newEnv, b, true) }
-      eval(newEnv, e.instantiate(i => Var(addrs(i))), stk)
+      copyArgs(stackB, stackP.b, size.b, args.b)
+      copyArgs(stackU, stackP.u, size.u, args.u)
+      copyArgs(stackN, stackP.n, size.n, args.n)
 
-    case Case(e, bs, d) =>
-      val (body, aug) = pickBranch(env, e, bs, d)
-      eval(env ++ aug, body, stk)
+      0 to (size.b - args.b) foreach { i => stackB(i) = null }
+      0 to (size.n - args.n) foreach { i => stackN(i) = null }
 
-    case Dict(xs, ys)   => appl(buildDict(env, xs, ys), stk)
-
-    case LamDict(e)     => stk match {
-      case Nil => Func(1, evalLam(env, e)(_ => 0))
-      case dict :: rest =>
-        val addr = Address("lamdict")
-        eval(env + (addr -> dict), e.instantiate(_ => Var(addr)), rest)
-    }
-
-    case AppDict(x, y)  =>  eval(env, x, evalDict(env, y) :: stk)
-
-    case PrimOp(name)   => appl(PrimOps.primOpDefs(name), stk)
-
-    case f@ForeignMethod(static, _, _, _) => {
-      def mk: Runtime =
-        Func((f.arity + (if(static) 0 else 1)).toByte, args => {
-          val evaledArgs = args.map(a => whnf(a) match {
-            case Prim(e) => e.asInstanceOf[AnyRef]
-            case _ => panic("Non-Prim in invocation of ForeignMethod.")
-          })
-          if (static)
-            Prim(f.method.invoke(null, evaledArgs:_*))
-          else
-            Prim(f.method.invoke(evaledArgs.head, evaledArgs.tail:_*))
-        })
-      if (static && f.arity == 0) appl(Prim(f.method.invoke(null)), stk)
-      else appl(mk, stk)
-    }
-
-    case f@ForeignConstructor(_, _) =>
-      if(f.arity == 0) appl(Prim(f.con.newInstance()), stk)
-      else appl(Func(f.arity, args => {
-        val evaledArgs = args.map(a => whnf(a) match {
-          case Prim(e) => e.asInstanceOf[AnyRef]
-          case _ => panic("Non-Prim in invocation of ForiegnConstructor.")
-        })
-        Prim(f.con.newInstance(evaledArgs:_*))
-      }), stk)
-
-    case f@ForeignValue(static, _, _) =>
-      if(static) appl(Prim(f.field.get(null)), stk)
-      else appl(Func(1, args => args match {
-        case List(x) => whnf(x) match {
-          case Prim(e) => Prim(f.field.get(e.asInstanceOf[AnyRef]))
-          case _ => panic("Non-Prim in invocation of ForiegnValue.")
-        }
-      }), stk)
-  }
-
-  def buildDict(env: Env, supers: List[Core[Address]], slots: List[Scope[Byte, Core, Address]]) = {
-    val esupers = supers.map(eval(env, _))
-    var newEnv : Env = null
-    val slotAddrs = slots.map(_ => Address("buildDict"))
-    val eslots = slots.map(b => Thunk(newEnv, b.instantiate(i => Var(slotAddrs(i))), true))
-    newEnv = env ++ slotAddrs.zip(eslots).toMap
-    Evidence(esupers, eslots)
-  }
-
-  def evalDict(env: Env, y: Core[Address]) = whnf(eval(env, y))
-
-  private def evalLam[T](env: Env, s:Scope[T, Core, Address])(f: T => Int): List[Runtime] => Runtime = l => {
-    val addrs = l.map(_ => Address("evalLam"))
-    val newEnv = addrs.zip(l).toMap ++ env
-    eval(newEnv, s.instantiate(b => Var(addrs(f(b)))))
-  }
-
-  private def pickBranch(env: Env, c: Core[Address],
-                         branches: Map[Byte, (Byte, Scope[Byte, Core, Address])],
-                         default: Option[Scope[Unit, Core, Address]]): (Core[Address], Env) = {
-    lazy val evaledAddr = Address("pickBranch:top")
-    def defaultCase(e: Runtime): (Core[Address], Env) = (default.get.instantiate(_ => Var(evaledAddr)), Map(evaledAddr -> e))
-
-    whnf(eval(env, c)) match {
-      case b: Bottom => (Var(evaledAddr), Map(evaledAddr -> b))
-      case d@Data(tag, fields) =>
-        branches.get(tag) match {
-          case Some((_, body)) =>
-            val addrs = fields.map(_ => Address("pickBranch:body"))
-            (body.instantiate(b => Var((evaledAddr :: addrs)(b.toInt))), ((evaledAddr,d) :: addrs.zip(fields)).toMap)
-          case None if default.isDefined => defaultCase(d)
-          case _ => panic("non-exhaustive case statement without default")
-        }
-      case x if branches.size == 0 && default.isDefined => defaultCase(x)
-      case x => panic(s"pick branch is confused: $x : ${x.getClass}")
+      copy(stackP = addSorted(stackP, subSorted(size, args)))
     }
   }
 
-  @annotation.tailrec
-  private def appl(v: Runtime, stk: List[Runtime]): Runtime = stk match {
-    case Nil => v
-    case a :: stkp => whnf(v) match {
-      case t : Thunk                   => sys.error("PANIC: whnf returned thunk")
-      case b : Bottom                  => b
-      case Func(arity, f)              =>
-        if(stk.length < arity) PartialApp(v, stk)
-        else {
-          val (args, rest) = stk.splitAt(arity)
-          appl(f(args), rest)
-        }
-      case PartialApp(f, args)         => appl(f, args ++ stk)
-      case Prim(f : Function1[Any, _]) => ??? // appl(Prim(f(a.extract)), stkp)
-      case f                           => panic(s"Cannot apply runtime value $f to $a")
-    }
-  }
+  sealed abstract class State
+    case class Eval(code: G, localEnv: Env) extends State
+    case class Enter(addr: Address) extends State
+    case class ReturnCon(tag: Long, args: Sorted[Int]) extends State
+    case class ReturnLit(value: Long) extends State
 
-  @annotation.tailrec
-  final def whnf(r: Runtime, chain: List[Thunk] = Nil): Runtime = r match {
-    case t: Thunk => t.state match {
-      case Delayed(env, c) => whnf(eval(env, c), t :: chain)
-      case BlackHole       => writeback(Bottom(sys.error("infinite loop detected")), chain)
-      case Evaluated(r)    => writeback(r, chain)
-    }
-    case _ => writeback(r, chain)
+  // @annotation.tailrec
+  def execute(state: State, ms: MachineState): Unit = state match {
+    case Eval(code, localEnv) => ()
+    case Enter(addr) => ()
+    case ReturnCon(tag, args) => ()
+    case ReturnLit(value) => ()
   }
-
-  @annotation.tailrec
-  private def writeback(answer: Runtime, chain: List[Thunk]): Runtime = chain match {
-    case t :: ts =>
-      t.state = Evaluated(answer)
-      writeback(answer, ts)
-    case Nil => answer
-  }
-
-  def panic(msg: String) = sys.error(s"PANIC: $msg")
 }
